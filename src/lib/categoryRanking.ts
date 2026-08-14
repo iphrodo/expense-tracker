@@ -20,3 +20,18 @@ export function rankCategoriesByRecency(
     return scoreB - scoreA
   })
 }
+
+export function rankCategoriesByCount(categories: Category[], transactions: Transaction[]): Category[] {
+  const counts = new Map<number, number>()
+  for (const tx of transactions) {
+    counts.set(tx.categoryId, (counts.get(tx.categoryId) ?? 0) + 1)
+  }
+  return [...categories].sort((a, b) => {
+    const countA = counts.get(a.id) ?? 0
+    const countB = counts.get(b.id) ?? 0
+    if (countB !== countA) {
+      return countB - countA
+    }
+    return a.name.localeCompare(b.name)
+  })
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseAmountExpression } from '../../lib/expressionParser'
-import { rankCategoriesByRecency } from '../../lib/categoryRanking'
+import { rankCategoriesByCount } from '../../lib/categoryRanking'
 import {
   createTransactions,
   deleteTransactions,
@@ -42,7 +42,7 @@ export function ExpenseEntryForm() {
   }, [])
 
   const rankedCategories = useMemo(
-    () => rankCategoriesByRecency(categories, transactions, new Date()),
+    () => rankCategoriesByCount(categories, transactions),
     [categories, transactions],
   )
 

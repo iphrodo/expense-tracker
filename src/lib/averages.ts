@@ -44,22 +44,31 @@ export function computeAverages(
     return true
   })
 
-  const byCategory = new Map<number, { total: number; months: Set<string> }>()
+  const allMonths = new Set(
+    transactions.map((tx) => monthOf(tx.date)).filter((month) => isMonthComplete(month, now, monthFlags)),
+  )
+
+  const totalsByCategory = new Map<number, number>()
   for (const tx of eligible) {
-    const entry = byCategory.get(tx.categoryId) ?? { total: 0, months: new Set<string>() }
-    entry.total += tx.amountCents
-    entry.months.add(monthOf(tx.date))
-    byCategory.set(tx.categoryId, entry)
+    totalsByCategory.set(tx.categoryId, (totalsByCategory.get(tx.categoryId) ?? 0) + tx.amountCents)
+  }
+
+  const excludedMonthsByCategory = new Map<number, number>()
+  for (const e of exclusions) {
+    if (!allMonths.has(e.month)) {
+      continue
+    }
+    excludedMonthsByCategory.set(e.categoryId, (excludedMonthsByCategory.get(e.categoryId) ?? 0) + 1)
   }
 
   const rows: AverageRow[] = []
-  for (const [categoryId, { total, months }] of byCategory) {
-    const monthsCounted = months.size
+  for (const [categoryId, total] of totalsByCategory) {
+    const monthsCounted = allMonths.size - (excludedMonthsByCategory.get(categoryId) ?? 0)
     rows.push({
       categoryId,
       total,
       monthsCounted,
-      average: monthsCounted === 0 ? null : total / monthsCounted,
+      average: monthsCounted <= 0 ? null : total / monthsCounted,
     })
   }
   return rows

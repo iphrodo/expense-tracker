@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, forwardRef, type KeyboardEvent } from 'react'
 import type { Category } from '../../db/schema'
 
-const CHIP_COUNT = 8
+const CHIP_COUNT = 10
 
 interface CategorySelectorProps {
   rankedCategories: Category[]
