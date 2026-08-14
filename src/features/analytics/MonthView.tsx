@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Transaction } from '../../db/schema'
 import { monthOf } from '../../lib/averages'
 import { rankCategoriesByRecency } from '../../lib/categoryRanking'
@@ -19,6 +19,22 @@ import { EditTransactionPanel } from '../entry/EditTransactionPanel'
 function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7)
 }
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
 
 export function MonthView() {
   const categories = useCategories()
@@ -62,6 +78,52 @@ export function MonthView() {
   )
   const monthFlag = monthFlags.find((f) => f.month === month)
 
+  const [selectedYear, selectedMonthIndex] = useMemo(() => {
+    const [y, m] = month.split('-')
+    return [Number(y), Number(m) - 1]
+  }, [month])
+
+  const monthsWithData = useMemo(
+    () => [...new Set(transactions.map((tx) => monthOf(tx.date)))].sort(),
+    [transactions],
+  )
+
+  const monthIndexesByYear = useMemo(() => {
+    const map = new Map<number, number[]>()
+    for (const key of monthsWithData) {
+      const [y, m] = key.split('-')
+      const year = Number(y)
+      const list = map.get(year) ?? []
+      list.push(Number(m) - 1)
+      map.set(year, list)
+    }
+    return map
+  }, [monthsWithData])
+
+  const availableYears = useMemo(
+    () => [...monthIndexesByYear.keys()].sort((a, b) => a - b),
+    [monthIndexesByYear],
+  )
+
+  const years = availableYears.length > 0 ? availableYears : [selectedYear]
+  const monthIndexesForSelectedYear = monthIndexesByYear.get(selectedYear) ?? [selectedMonthIndex]
+
+  useEffect(() => {
+    if (monthsWithData.length > 0 && !monthsWithData.includes(month)) {
+      setMonth(monthsWithData[monthsWithData.length - 1])
+    }
+  }, [monthsWithData, month])
+
+  function updateMonth(year: number, monthIndex: number) {
+    setMonth(`${year}-${String(monthIndex + 1).padStart(2, '0')}`)
+  }
+
+  function handleYearChange(newYear: number) {
+    const indexes = monthIndexesByYear.get(newYear) ?? []
+    const newIndex = indexes.includes(selectedMonthIndex) ? selectedMonthIndex : (indexes[0] ?? 0)
+    updateMonth(newYear, newIndex)
+  }
+
   async function toggleExclusion(categoryId: number) {
     const key = `${categoryId}|${month}`
     if (exclusionKeys.has(key)) {
@@ -87,12 +149,28 @@ export function MonthView() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
+        <select
+          value={selectedMonthIndex}
+          onChange={(e) => updateMonth(selectedYear, Number(e.target.value))}
           className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-        />
+        >
+          {monthIndexesForSelectedYear.map((index) => (
+            <option key={index} value={index}>
+              {MONTH_NAMES[index]}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedYear}
+          onChange={(e) => handleYearChange(Number(e.target.value))}
+          className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          {years.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={() => void toggleMonthComplete()}
