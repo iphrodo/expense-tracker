@@ -1,16 +1,16 @@
 import { parseSeedCsv, CsvParseError } from '../../lib/csv'
 import { db } from '../../db/db'
-import { getExistingImportRowIndexes, getOrCreateCategory } from '../../db/repository'
+import { getExistingImportedTransactions, getOrCreateCategory } from '../../db/repository'
 
 export interface ImportOptions {
-  expectedRowCount: number
-  expectedAmountSum: number
+  expectedRowCount?: number
+  expectedAmountSum?: number
 }
 
 export interface ImportReport {
   categoriesCreated: number
-  transactionsImported: number
-  skippedAlreadyImported: number
+  transactionsCreated: number
+  transactionsUpdated: number
 }
 
 export class ImportAssertionError extends Error {}
@@ -23,22 +23,25 @@ export const SEED_IMPORT_EXPECTATIONS: ImportOptions = {
 
 export async function importSeedCsv(
   csvText: string,
-  options: ImportOptions,
+  options: ImportOptions = {},
 ): Promise<ImportReport> {
   const parsed = parseSeedCsv(csvText)
 
-  if (parsed.rowCount !== options.expectedRowCount) {
+  if (options.expectedRowCount !== undefined && parsed.rowCount !== options.expectedRowCount) {
     throw new ImportAssertionError(
       `Row count mismatch: expected ${options.expectedRowCount}, got ${parsed.rowCount}`,
     )
   }
-  if (parsed.amountSumCents !== options.expectedAmountSum) {
+  if (
+    options.expectedAmountSum !== undefined &&
+    parsed.amountSumCents !== options.expectedAmountSum
+  ) {
     throw new ImportAssertionError(
       `Amount sum mismatch: expected ${options.expectedAmountSum} cents, got ${parsed.amountSumCents} cents`,
     )
   }
 
-  const existingRowIndexes = await getExistingImportRowIndexes()
+  const existingByRowIndex = await getExistingImportedTransactions()
   const existingCategoryNames = new Set((await db.categories.toArray()).map((c) => c.name))
 
   const categoryIdByName = new Map<string, number>()
@@ -55,27 +58,40 @@ export async function importSeedCsv(
     }
   }
 
-  const toInsert = parsed.rows.filter((row) => !existingRowIndexes.has(row.rowIndex))
+  let transactionsCreated = 0
+  let transactionsUpdated = 0
 
   await db.transaction('rw', db.transactions, async () => {
-    for (const row of toInsert) {
+    for (const row of parsed.rows) {
       const categoryId = categoryIdByName.get(row.category)
       if (categoryId === undefined) {
         throw new CsvParseError(`Line ${row.lineNumber}: category "${row.category}" not created`)
       }
-      await db.transactions.add({
-        amountCents: row.amountCents,
-        categoryId,
-        date: row.date,
-        note: row.note,
-        importRowIndex: row.rowIndex,
-      })
+      const existing = existingByRowIndex.get(row.rowIndex)
+      if (existing) {
+        await db.transactions.update(existing.id, {
+          amountCents: row.amountCents,
+          categoryId,
+          date: row.date,
+          note: row.note,
+        })
+        transactionsUpdated++
+      } else {
+        await db.transactions.add({
+          amountCents: row.amountCents,
+          categoryId,
+          date: row.date,
+          note: row.note,
+          importRowIndex: row.rowIndex,
+        })
+        transactionsCreated++
+      }
     }
   })
 
   return {
     categoriesCreated,
-    transactionsImported: toInsert.length,
-    skippedAlreadyImported: parsed.rows.length - toInsert.length,
+    transactionsCreated,
+    transactionsUpdated,
   }
 }

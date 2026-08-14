@@ -3,6 +3,19 @@ import { importSeedCsv, SEED_IMPORT_EXPECTATIONS } from './importer'
 import { exportTransactionsToCsv } from '../../lib/csv'
 import { useCategories, useTransactions } from '../../db/repository'
 
+function formatImportStatus(report: {
+  transactionsCreated: number
+  transactionsUpdated: number
+  categoriesCreated: number
+}): string {
+  return (
+    `Imported ${report.transactionsCreated} new transactions, created ${report.categoriesCreated} categories` +
+    (report.transactionsUpdated > 0
+      ? ` (${report.transactionsUpdated} existing transactions updated)`
+      : '')
+  )
+}
+
 export function ImportExportScreen() {
   const [status, setStatus] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -19,12 +32,25 @@ export function ImportExportScreen() {
       }
       const text = await response.text()
       const report = await importSeedCsv(text, SEED_IMPORT_EXPECTATIONS)
-      setStatus(
-        `Imported ${report.transactionsImported} transactions, created ${report.categoriesCreated} categories` +
-          (report.skippedAlreadyImported > 0
-            ? ` (${report.skippedAlreadyImported} already imported, skipped)`
-            : ''),
-      )
+      setStatus(formatImportStatus(report))
+    } catch (err) {
+      setStatus(err instanceof Error ? `Import failed: ${err.message}` : 'Import failed')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleFilePicked(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setImporting(true)
+    setStatus(null)
+    try {
+      const text = await file.text()
+      const report = await importSeedCsv(text)
+      setStatus(formatImportStatus(report))
     } catch (err) {
       setStatus(err instanceof Error ? `Import failed: ${err.message}` : 'Import failed')
     } finally {
@@ -64,6 +90,23 @@ export function ImportExportScreen() {
             {status}
           </p>
         )}
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-lg font-semibold">Re-import a corrected file</h2>
+        <p className="mb-2 text-sm text-neutral-500">
+          Pick a CSV file from disk in the same format as export. Rows whose{' '}
+          <code>row_index</code> already exists overwrite that transaction's amount, date,
+          category, and note; new <code>row_index</code> values are added as new transactions.
+        </p>
+        <input
+          type="file"
+          accept=".csv"
+          disabled={importing}
+          onChange={(e) => void handleFilePicked(e)}
+          data-testid="import-file-input"
+          className="text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-200 file:px-3 file:py-1.5 file:font-semibold file:text-neutral-900 dark:file:bg-neutral-700 dark:file:text-neutral-100"
+        />
       </div>
 
       <div>

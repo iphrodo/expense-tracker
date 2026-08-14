@@ -3,6 +3,7 @@ import { db } from './db'
 import {
   createTransactions,
   deleteTransaction,
+  getExistingImportedTransactions,
   getOrCreateCategory,
   restoreTransaction,
   updateTransaction,
@@ -45,6 +46,25 @@ describe('editing a transaction', () => {
     const updated = await db.transactions.get(id)
     expect(updated?.importRowIndex).toBe(42)
     expect(updated?.amountCents).toBe(1500)
+  })
+})
+
+describe('getExistingImportedTransactions', () => {
+  it('maps importRowIndex to the corresponding transaction, ignoring non-imported rows', async () => {
+    const categoryId = await getOrCreateCategory('Food', false)
+    await createTransactions([{ amountCents: 500, categoryId, date: '2026-01-01', note: '' }])
+    const imported = await db.transactions.add({
+      amountCents: 1000,
+      categoryId,
+      date: '2026-01-02',
+      note: 'seeded',
+      importRowIndex: 7,
+    })
+
+    const result = await getExistingImportedTransactions()
+
+    expect(result.size).toBe(1)
+    expect(result.get(7)?.id).toBe(imported)
   })
 })
 

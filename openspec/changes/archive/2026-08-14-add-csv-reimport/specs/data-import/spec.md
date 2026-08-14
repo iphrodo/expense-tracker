@@ -1,41 +1,4 @@
-# data-import Specification
-
-## Purpose
-
-Moves nine months of transaction history out of the source spreadsheet into the app exactly once,
-and keeps an escape hatch back out to CSV so the user is never locked into this app's storage.
-
-## Requirements
-
-### Requirement: One-time CSV seed import
-The system SHALL support importing transactions from a CSV file at `/seed/transactions.csv` with
-columns `row_index, date, category, amount_eur, note, is_daily, source_sheet`. The system SHALL
-create a `Category` record for each distinct `category` value encountered, setting that
-category's `isDaily` flag from the `is_daily` column. The `source_sheet` column SHALL be read but
-not stored or otherwise used, since it is migration provenance only. `row_index` SHALL be a
-unique, stable integer per row in the source file — assigned once when the CSV is generated from
-the spreadsheet — and SHALL NOT be derived from `date`, `category`, `amount_eur`, or `note`, since
-those columns are not unique per row (a single spreadsheet cell batching several purchases, e.g.
-`=5.96+4.22+4.96`, expands into multiple rows that legitimately share date, category, and amount).
-
-#### Scenario: Import creates categories and transactions from CSV rows
-- **WHEN** `/seed/transactions.csv` contains rows for 29 distinct category values across 1763
-  data rows
-- **THEN** the import creates 29 `Category` records (one per distinct value, `isDaily` set per
-  row) and 1763 `Transaction` records, one per data row, with `amountEur` stored as integer cents
-  converted from `amount_eur`
-
-#### Scenario: Negative amount_eur values are imported as valid transactions
-- **WHEN** a row in `/seed/transactions.csv` has a negative `amount_eur` value, such as a refund
-  recorded against its original category (e.g. `-50.78`)
-- **THEN** the import creates a `Transaction` with a negative `amountEur` in integer cents; a
-  negative value is not treated as malformed and is not rejected or skipped
-
-#### Scenario: Rows sharing date, category, and amount are all imported
-- **WHEN** `/seed/transactions.csv` contains 3 rows with distinct `row_index` values that share
-  the same `date`, `category`, and `amount_eur` (a batched-cell expansion)
-- **THEN** the import creates 3 separate `Transaction` records, none of them dropped as a
-  duplicate
+## MODIFIED Requirements
 
 ### Requirement: Import upserts rows using row_index as the identity key
 Running the import against a CSV file SHALL NOT create duplicate `Category` or `Transaction`
@@ -122,6 +85,8 @@ offending row rather than silently skipping it.
 - **THEN** the import fails with an error identifying both rows, since `row_index` uniqueness is
   required for it to serve as the identity key
 
+## ADDED Requirements
+
 ### Requirement: Import from a user-picked file
 The system SHALL allow the user to pick an arbitrary CSV file from their local disk, in the same
 column shape as the seed import (`row_index, date, category, amount_eur, note, is_daily,
@@ -140,18 +105,3 @@ caller-supplied expected row count or amount sum.
 - **WHEN** the user picks a CSV file from disk that contains a malformed row
 - **THEN** the import fails with an error identifying the offending row, consistent with seed
   import behavior, and no partial import is committed for that file
-
-### Requirement: CSV export of all transactions
-The system SHALL support exporting all transactions currently stored, in the same column shape as
-the import format (`row_index, date, category, amount_eur, note, is_daily, source_sheet`), so data
-can be taken out of the app independent of its internal storage, and so an exported file remains
-re-importable without breaking idempotency.
-
-#### Scenario: Export produces one row per transaction in import-compatible shape
-- **WHEN** the user triggers export with N transactions stored across multiple categories
-- **THEN** the exported CSV contains exactly N data rows plus a header row, with `row_index`
-  (the original imported row's index, or a newly assigned unique index for transactions entered
-  directly in the app), `date`, `category`, `amount_eur` (converted back from integer cents to a
-  decimal EUR value), `note`, and `is_daily` populated from each transaction and its category,
-  and `source_sheet` present as an empty column
-</content>
