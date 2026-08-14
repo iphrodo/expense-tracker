@@ -102,8 +102,8 @@ export function computeDailyRunRate(
 }
 
 function daysInMonthOf(month: string): number {
-  const [year, monthNum] = month.split('-').map(Number)
-  return new Date(year, monthNum, 0).getDate()
+  const [y, m] = month.split('-')
+  return new Date(Number(y), Number(m), 0).getDate()
 }
 
 function daysElapsedIn(month: string, now: Date): number {

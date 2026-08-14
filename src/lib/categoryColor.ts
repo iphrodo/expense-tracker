@@ -27,5 +27,5 @@ const PALETTE = [
  */
 export function assignCategoryColors(categoryIds: Iterable<number>): Map<number, string> {
   const sortedIds = [...new Set(categoryIds)].sort((a, b) => a - b)
-  return new Map(sortedIds.map((id, index) => [id, PALETTE[index % PALETTE.length]]))
+  return new Map(sortedIds.map((id, index) => [id, PALETTE[index % PALETTE.length]!]))
 }

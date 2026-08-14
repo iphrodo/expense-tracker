@@ -146,7 +146,7 @@ export function MonthView() {
 
   useEffect(() => {
     if (monthsWithData.length > 0 && !monthsWithData.includes(month)) {
-      setMonth(monthsWithData[monthsWithData.length - 1])
+      setMonth(monthsWithData[monthsWithData.length - 1]!)
     }
   }, [monthsWithData, month])
 
