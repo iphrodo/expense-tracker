@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Transaction } from '../../db/schema'
 import { computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
 import { assignCategoryColors } from '../../lib/categoryColor'
-import { rankCategoriesByRecency } from '../../lib/categoryRanking'
+import { rankCategoriesByCount } from '../../lib/categoryRanking'
 import { formatCents } from '../../lib/money'
 import {
   getOrCreateCategory,
@@ -53,7 +53,7 @@ export function MonthView() {
     [categories],
   )
   const rankedCategories = useMemo(
-    () => rankCategoriesByRecency(categories, transactions, new Date()),
+    () => rankCategoriesByCount(categories, transactions),
     [categories, transactions],
   )
 

@@ -14,7 +14,7 @@ function tx(partial: Partial<Transaction> & Pick<Transaction, 'categoryId' | 'da
 }
 
 describe('computeAverages', () => {
-  it('uses a per-category divisor that differs by category', () => {
+  it('divides by every tracked month, not just months a category has transactions in', () => {
     const now = new Date('2026-06-15')
     const transactions: Transaction[] = [
       tx({ categoryId: 1, date: '2026-01-05', amountCents: 1000 }),
@@ -29,13 +29,14 @@ describe('computeAverages', () => {
     const rows = computeAverages(transactions, [], [], now)
     const rowA = rows.find((r) => r.categoryId === 1)
     const rowB = rows.find((r) => r.categoryId === 2)
-    expect(rowA?.monthsCounted).toBe(3)
-    expect(rowA?.average).toBe(1000)
+    // Five distinct months (Jan-May) are tracked overall, so both categories divide by 5.
+    expect(rowA?.monthsCounted).toBe(5)
+    expect(rowA?.average).toBe(600)
     expect(rowB?.monthsCounted).toBe(5)
     expect(rowB?.average).toBe(900)
   })
 
-  it('removes an excluded category-month from both numerator and divisor', () => {
+  it('removes an excluded category-month from the numerator and shrinks the divisor by one', () => {
     const now = new Date('2026-06-15')
     const transactions: Transaction[] = [
       tx({ categoryId: 1, date: '2026-01-05', amountCents: 1000 }),
@@ -46,12 +47,13 @@ describe('computeAverages', () => {
     const exclusions: AverageExclusion[] = [{ id: 1, categoryId: 1, month: '2026-02', reason: '' }]
     const rows = computeAverages(transactions, exclusions, [], now)
     const rowA = rows.find((r) => r.categoryId === 1)
+    // 4 tracked months minus 1 excluded month = 3.
     expect(rowA?.monthsCounted).toBe(3)
     expect(rowA?.total).toBe(3000)
     expect(rowA?.average).toBe(1000)
   })
 
-  it('guards division by zero when all months for a category are excluded', () => {
+  it('guards division by zero when every tracked month is excluded for a category', () => {
     const now = new Date('2026-06-15')
     const transactions: Transaction[] = [
       tx({ categoryId: 1, date: '2026-01-05', amountCents: 1000 }),
