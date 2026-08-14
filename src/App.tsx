@@ -1,28 +1,24 @@
 import { useState } from 'react'
 import { ToastProvider } from './app/ToastProvider'
-import { EntryScreen } from './features/entry/EntryScreen'
 import { MonthView } from './features/analytics/MonthView'
 import { AveragesView } from './features/analytics/AveragesView'
 import { ImportExportScreen } from './features/import/ImportExportScreen'
 
-type Screen = 'entry' | 'month' | 'averages' | 'import'
+type Screen = 'month' | 'averages' | 'import'
 
 const NAV_ITEMS: { id: Screen; label: string }[] = [
-  { id: 'entry', label: 'Entry' },
   { id: 'month', label: 'Month' },
   { id: 'averages', label: 'Averages' },
   { id: 'import', label: 'Import / Export' },
 ]
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('entry')
+  const [screen, setScreen] = useState<Screen>('month')
 
   return (
     <ToastProvider>
       <div className="min-h-svh bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-        {screen === 'entry' ? (
-          <EntryScreen />
-        ) : screen === 'month' ? (
+        {screen === 'month' ? (
           <MonthView />
         ) : screen === 'averages' ? (
           <AveragesView />

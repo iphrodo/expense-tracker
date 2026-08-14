@@ -16,6 +16,7 @@ import {
   useTransactions,
 } from '../../db/repository'
 import { EditTransactionPanel } from '../entry/EditTransactionPanel'
+import { ExpenseEntryForm } from '../entry/ExpenseEntryForm'
 
 function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7)
@@ -184,6 +185,8 @@ export function MonthView() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 lg:flex-row lg:items-start">
       <div className="flex flex-1 flex-col gap-4">
+        <ExpenseEntryForm />
+
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={selectedMonthIndex}

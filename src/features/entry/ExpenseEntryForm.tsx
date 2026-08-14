@@ -21,7 +21,7 @@ function yesterdayOf(dateIso: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function EntryScreen() {
+export function ExpenseEntryForm() {
   const categories = useCategories()
   const transactions = useTransactions()
   const { showUndoToast } = useToast()
@@ -90,7 +90,7 @@ export function EntryScreen() {
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4">
       <div>
         <input
           ref={amountRef}
