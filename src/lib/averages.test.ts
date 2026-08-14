@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { AverageExclusion, MonthFlag, Transaction } from '../db/schema'
-import { computeAverages, computeDailyRunRate } from './averages'
+import {
+  computeAverages,
+  computeDailyRunRate,
+  computeMonthSummary,
+  computeNamedCategoryDailyAverages,
+} from './averages'
 
 let nextId = 1
 
@@ -127,5 +132,107 @@ describe('computeDailyRunRate', () => {
     ]
     const result = computeDailyRunRate(transactions, categories, now)
     expect(result.dailyRateCents).toBe(1300)
+  })
+})
+
+describe('computeNamedCategoryDailyAverages', () => {
+  const foodCategories = [
+    { id: 1, name: 'Іжа в закладі', isDaily: true },
+    { id: 2, name: 'Іжа на виніс', isDaily: true },
+    { id: 3, name: 'Продукти', isDaily: true },
+  ]
+  const treatCategories = [
+    { id: 4, name: 'Солодке', isDaily: true },
+    { id: 5, name: 'Алкоголь', isDaily: true },
+    { id: 6, name: 'Снеки', isDaily: true },
+  ]
+
+  it('sums every category in a group, divided by days elapsed', () => {
+    const now = new Date('2026-06-14')
+    const transactions: Transaction[] = [
+      tx({ categoryId: 1, date: '2026-06-05', amountCents: 40000 }),
+      tx({ categoryId: 2, date: '2026-06-06', amountCents: 20000 }),
+      tx({ categoryId: 3, date: '2026-06-07', amountCents: 10000 }),
+    ]
+    const rows = computeNamedCategoryDailyAverages(transactions, foodCategories, '2026-06', now)
+    const row = rows.find((r) => r.label === 'тільки їжа')
+    expect(row?.dailyRateCents).toBe(5000)
+  })
+
+  it('yields a zero average for a group with no transactions this month', () => {
+    const now = new Date('2026-06-14')
+    const rows = computeNamedCategoryDailyAverages([], treatCategories, '2026-06', now)
+    const row = rows.find((r) => r.label === 'солодке+алк+чіпси')
+    expect(row?.dailyRateCents).toBe(0)
+  })
+
+  it('yields a zero average when none of a group categories exist in the database', () => {
+    const now = new Date('2026-06-14')
+    const rows = computeNamedCategoryDailyAverages([], [], '2026-06', now)
+    expect(rows.find((r) => r.label === 'тільки їжа')?.dailyRateCents).toBe(0)
+    expect(rows.find((r) => r.label === 'солодке+алк+чіпси')?.dailyRateCents).toBe(0)
+  })
+
+  it('uses a divisor of 1 on the first day of the month', () => {
+    const now = new Date('2026-06-01')
+    const transactions: Transaction[] = [tx({ categoryId: 3, date: '2026-06-01', amountCents: 4000 })]
+    const rows = computeNamedCategoryDailyAverages(transactions, foodCategories, '2026-06', now)
+    expect(rows.find((r) => r.label === 'тільки їжа')?.dailyRateCents).toBe(4000)
+  })
+
+  it('reflects a refund reducing a group daily average', () => {
+    const now = new Date('2026-06-10')
+    const transactions: Transaction[] = [
+      tx({ categoryId: 4, date: '2026-06-05', amountCents: 50000 }),
+      tx({ categoryId: 5, date: '2026-06-06', amountCents: -10000 }),
+    ]
+    const rows = computeNamedCategoryDailyAverages(transactions, treatCategories, '2026-06', now)
+    expect(rows.find((r) => r.label === 'солодке+алк+чіпси')?.dailyRateCents).toBe(4000)
+  })
+
+  it('uses the full days-in-month divisor for a past month', () => {
+    const now = new Date('2026-06-10')
+    const transactions: Transaction[] = [tx({ categoryId: 3, date: '2026-04-15', amountCents: 12000 })]
+    const rows = computeNamedCategoryDailyAverages(transactions, foodCategories, '2026-04', now)
+    expect(rows.find((r) => r.label === 'тільки їжа')?.dailyRateCents).toBe(400)
+  })
+})
+
+describe('computeMonthSummary', () => {
+  const categories = [
+    { id: 1, name: 'Продукти', isDaily: true },
+    { id: 2, name: 'Квартира', isDaily: false },
+  ]
+
+  it('splits the month total into daily and non-daily, and projects the daily rate', () => {
+    const now = new Date('2026-06-10')
+    const transactions: Transaction[] = [
+      tx({ categoryId: 1, date: '2026-06-05', amountCents: 50000 }),
+      tx({ categoryId: 2, date: '2026-06-02', amountCents: 30000 }),
+    ]
+    const summary = computeMonthSummary(transactions, categories, '2026-06', now)
+    expect(summary.totalCents).toBe(80000)
+    expect(summary.dailyCents).toBe(50000)
+    expect(summary.nonDailyCents).toBe(30000)
+    expect(summary.dailyRateCents).toBe(5000)
+    expect(summary.projectedCents).toBe(150000)
+  })
+
+  it('uses the full days-in-month divisor and projection for a past month', () => {
+    const now = new Date('2026-06-10')
+    const transactions: Transaction[] = [tx({ categoryId: 1, date: '2026-04-15', amountCents: 12000 })]
+    const summary = computeMonthSummary(transactions, categories, '2026-04', now)
+    expect(summary.dailyRateCents).toBe(400)
+    expect(summary.projectedCents).toBe(12000)
+  })
+
+  it('excludes transactions from other months', () => {
+    const now = new Date('2026-06-10')
+    const transactions: Transaction[] = [
+      tx({ categoryId: 1, date: '2026-05-05', amountCents: 99999 }),
+      tx({ categoryId: 1, date: '2026-06-05', amountCents: 1000 }),
+    ]
+    const summary = computeMonthSummary(transactions, categories, '2026-06', now)
+    expect(summary.totalCents).toBe(1000)
   })
 })
