@@ -1,24 +1,33 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { db } from '../../db/db'
+// Integration tests against a real Postgres + PostgREST instance (see
+// scripts/test-db/setup.sh and openspec/changes/add-shared-backend/tasks.md section 6).
+// Run `scripts/test-db/setup.sh` once before running this file.
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { supabase } from '../../lib/supabase'
 import { CSV_COLUMNS } from '../../lib/csv'
+import { getAllData } from '../../db/repository'
 import { importSeedCsv, ImportAssertionError, SEED_IMPORT_EXPECTATIONS } from './importer'
 
 const header = CSV_COLUMNS.join(',')
 
-beforeEach(async () => {
-  await db.transactions.clear()
-  await db.categories.clear()
-})
+async function clearAll() {
+  await supabase.from('average_exclusions').delete().gte('id', 0)
+  await supabase.from('transactions').delete().gte('id', 0)
+  await supabase.from('month_flags').delete().gte('id', 0)
+  await supabase.from('categories').delete().gte('id', 0)
+}
+
+beforeEach(clearAll)
+afterAll(clearAll)
 
 describe('importSeedCsv', () => {
   it('re-running the same file leaves records equivalent', async () => {
     const csv = [header, '0,2026-01-01,Food,12.50,,False,'].join('\n')
     await importSeedCsv(csv)
-    const first = await db.transactions.toArray()
+    const first = (await getAllData()).transactions
 
     const report = await importSeedCsv(csv)
 
-    const second = await db.transactions.toArray()
+    const second = (await getAllData()).transactions
     expect(second).toHaveLength(1)
     expect(second[0]?.amountCents).toBe(first[0]?.amountCents)
     expect(report.transactionsCreated).toBe(0)
@@ -32,7 +41,7 @@ describe('importSeedCsv', () => {
     const corrected = [header, '0,2025-12-01,Groceries,75.25,fixed,False,'].join('\n')
     const report = await importSeedCsv(corrected)
 
-    const all = await db.transactions.toArray()
+    const all = (await getAllData()).transactions
     expect(all).toHaveLength(1)
     expect(all[0]?.amountCents).toBe(7525)
     expect(all[0]?.note).toBe('fixed')
@@ -48,7 +57,7 @@ describe('importSeedCsv', () => {
 
     expect(report.transactionsCreated).toBe(1)
     expect(report.transactionsUpdated).toBe(1)
-    expect(await db.transactions.count()).toBe(2)
+    expect((await getAllData()).transactions).toHaveLength(2)
   })
 
   it('imports without expectations when none are supplied', async () => {
@@ -69,7 +78,7 @@ describe('importSeedCsv', () => {
     expect(SEED_IMPORT_EXPECTATIONS.expectedAmountSum).toBe(3644217)
   })
 
-  it('fails loudly on a malformed row without committing a partial import', async () => {
+  it('fails loudly on a malformed row without writing anything (parse fails before any write)', async () => {
     const csv = [
       header,
       '0,2026-01-01,Food,10.00,,False,',
@@ -77,6 +86,6 @@ describe('importSeedCsv', () => {
     ].join('\n')
 
     await expect(importSeedCsv(csv)).rejects.toThrow()
-    expect(await db.transactions.count()).toBe(0)
+    expect((await getAllData()).transactions).toHaveLength(0)
   })
 })

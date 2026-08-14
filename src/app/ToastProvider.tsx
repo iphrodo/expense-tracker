@@ -6,18 +6,29 @@ interface ToastState {
   onUndo: () => void
 }
 
+interface ErrorToastState {
+  id: number
+  message: string
+}
+
 interface ToastContextValue {
   showUndoToast: (message: string, onUndo: () => void) => void
+  showErrorToast: (message: string) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 const TOAST_DURATION_MS = 5000
+const ERROR_TOAST_DURATION_MS = 5000
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nextId = useRef(0)
+
+  const [errorToast, setErrorToast] = useState<ErrorToastState | null>(null)
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nextErrorId = useRef(0)
 
   const showUndoToast = useCallback((message: string, onUndo: () => void) => {
     if (timeoutRef.current) {
@@ -30,6 +41,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, TOAST_DURATION_MS)
   }, [])
 
+  const showErrorToast = useCallback((message: string) => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current)
+    }
+    const id = nextErrorId.current++
+    setErrorToast({ id, message })
+    errorTimeoutRef.current = setTimeout(() => {
+      setErrorToast((current) => (current?.id === id ? null : current))
+    }, ERROR_TOAST_DURATION_MS)
+  }, [])
+
   const handleUndo = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
@@ -39,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ToastContext.Provider value={{ showUndoToast }}>
+    <ToastContext.Provider value={{ showUndoToast, showErrorToast }}>
       {children}
       {toast && (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg dark:bg-neutral-100 dark:text-neutral-900">
@@ -51,6 +73,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           >
             Undo
           </button>
+        </div>
+      )}
+      {errorToast && (
+        <div
+          className={`fixed left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-lg bg-red-700 px-4 py-3 text-sm text-white shadow-lg dark:bg-red-600 ${toast ? 'bottom-20' : 'bottom-4'}`}
+        >
+          <span>{errorToast.message}</span>
         </div>
       )}
     </ToastContext.Provider>

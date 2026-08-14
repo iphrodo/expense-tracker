@@ -25,3 +25,9 @@ dist-ssr
 
 # Personal source data (already imported via public/seed/transactions.csv)
 /transactions.csv
+
+# Local env vars (Supabase credentials)
+.env
+
+# Disposable local Postgres/PostgREST instance for integration tests
+.local-pg

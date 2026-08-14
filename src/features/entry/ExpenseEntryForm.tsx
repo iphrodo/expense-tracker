@@ -24,7 +24,7 @@ function yesterdayOf(dateIso: string): string {
 export function ExpenseEntryForm() {
   const categories = useCategories()
   const transactions = useTransactions()
-  const { showUndoToast } = useToast()
+  const { showUndoToast, showErrorToast } = useToast()
 
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -67,6 +67,10 @@ export function ExpenseEntryForm() {
     }))
 
     const savedCount = entries.length
+    const savedAmount = amount
+    const savedCategoryId = categoryId
+    const savedDate = date
+    const savedNote = note
     const idsPromise = createTransactions(entries)
 
     setAmount('')
@@ -76,13 +80,24 @@ export function ExpenseEntryForm() {
     setCategoryResetKey((k) => k + 1)
     amountRef.current?.focus()
 
-    const ids = await idsPromise
-    showUndoToast(
-      savedCount === 1 ? 'Transaction saved' : `${savedCount} transactions saved`,
-      () => {
-        void deleteTransactions(ids)
-      },
-    )
+    try {
+      const ids = await idsPromise
+      showUndoToast(
+        savedCount === 1 ? 'Transaction saved' : `${savedCount} transactions saved`,
+        () => {
+          void deleteTransactions(ids)
+        },
+      )
+    } catch {
+      setAmount(savedAmount)
+      setSelectedCategoryId(savedCategoryId)
+      setDate(savedDate)
+      setNote(savedNote)
+      if (savedNote) setNoteOpen(true)
+      showErrorToast(
+        savedCount === 1 ? 'Could not save transaction' : 'Could not save transactions',
+      )
+    }
   }
 
   async function handleCreateCategory(name: string): Promise<number> {

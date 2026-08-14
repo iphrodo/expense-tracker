@@ -30,6 +30,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Data reads/writes must always hit the network — a cached Supabase
+        // response would hide the other person's writes behind a stale cache.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/.*/,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
     }),
   ],
@@ -37,5 +45,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // repository.test.ts and importer.test.ts are integration tests sharing one
+    // local Postgres instance (see scripts/test-db/); parallel files would race
+    // on the same tables.
+    fileParallelism: false,
   },
 })

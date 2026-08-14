@@ -1,5 +1,5 @@
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from './db'
+import { useSyncExternalStore } from 'react'
+import { supabase } from '../lib/supabase'
 import type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
 
 export type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
@@ -12,63 +12,266 @@ export interface NewTransactionInput {
   importRowIndex?: number
 }
 
-export async function createTransactions(entries: NewTransactionInput[]): Promise<number[]> {
-  return db.transaction('rw', db.transactions, async () => {
-    const ids: number[] = []
-    for (const entry of entries) {
-      ids.push(await db.transactions.add(entry))
+// --- row <-> domain type mapping (Postgres uses snake_case columns) ---
+
+interface CategoryRow {
+  id: number
+  name: string
+  is_daily: boolean
+  is_archived: boolean
+  sort_order: number
+}
+
+interface TransactionRow {
+  id: number
+  date: string
+  category_id: number
+  amount_cents: number
+  note: string
+  import_row_index: number | null
+}
+
+interface MonthFlagRow {
+  id: number
+  month: string
+  is_complete: boolean
+}
+
+interface AverageExclusionRow {
+  id: number
+  category_id: number
+  month: string
+  reason: string
+}
+
+function categoryFromRow(row: CategoryRow): Category {
+  return {
+    id: row.id,
+    name: row.name,
+    isDaily: row.is_daily,
+    isArchived: row.is_archived,
+    sortOrder: row.sort_order,
+  }
+}
+
+function transactionFromRow(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    date: row.date,
+    categoryId: row.category_id,
+    amountCents: row.amount_cents,
+    note: row.note,
+    importRowIndex: row.import_row_index ?? undefined,
+  }
+}
+
+function monthFlagFromRow(row: MonthFlagRow): MonthFlag {
+  return { id: row.id, month: row.month, isComplete: row.is_complete }
+}
+
+function averageExclusionFromRow(row: AverageExclusionRow): AverageExclusion {
+  return { id: row.id, categoryId: row.category_id, month: row.month, reason: row.reason }
+}
+
+// --- small in-memory cache per table, invalidated after each successful write ---
+
+class TableStore<T> {
+  private data: T[] = []
+  private listeners = new Set<() => void>()
+  private loaded = false
+  private readonly load: () => Promise<T[]>
+
+  constructor(load: () => Promise<T[]>) {
+    this.load = load
+  }
+
+  private notify() {
+    this.listeners.forEach((listener) => listener())
+  }
+
+  async refresh(): Promise<void> {
+    this.data = await this.load()
+    this.loaded = true
+    this.notify()
+  }
+
+  getSnapshot = (): T[] => this.data
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    if (!this.loaded) {
+      void this.refresh()
     }
-    return ids
-  })
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+}
+
+async function loadCategories(): Promise<Category[]> {
+  const { data, error } = await supabase.from('categories').select('*').order('sort_order')
+  if (error) throw error
+  return (data as CategoryRow[]).map(categoryFromRow)
+}
+
+async function loadTransactions(): Promise<Transaction[]> {
+  const { data, error } = await supabase.from('transactions').select('*').order('date')
+  if (error) throw error
+  return (data as TransactionRow[]).map(transactionFromRow)
+}
+
+async function loadMonthFlags(): Promise<MonthFlag[]> {
+  const { data, error } = await supabase.from('month_flags').select('*')
+  if (error) throw error
+  return (data as MonthFlagRow[]).map(monthFlagFromRow)
+}
+
+async function loadAverageExclusions(): Promise<AverageExclusion[]> {
+  const { data, error } = await supabase.from('average_exclusions').select('*')
+  if (error) throw error
+  return (data as AverageExclusionRow[]).map(averageExclusionFromRow)
+}
+
+const categoriesStore = new TableStore(loadCategories)
+const transactionsStore = new TableStore(loadTransactions)
+const monthFlagsStore = new TableStore(loadMonthFlags)
+const averageExclusionsStore = new TableStore(loadAverageExclusions)
+
+export function useCategories(): Category[] {
+  return useSyncExternalStore(categoriesStore.subscribe, categoriesStore.getSnapshot)
+}
+
+export function useTransactions(): Transaction[] {
+  return useSyncExternalStore(transactionsStore.subscribe, transactionsStore.getSnapshot)
+}
+
+export function useMonthFlags(): MonthFlag[] {
+  return useSyncExternalStore(monthFlagsStore.subscribe, monthFlagsStore.getSnapshot)
+}
+
+export function useExclusions(): AverageExclusion[] {
+  return useSyncExternalStore(averageExclusionsStore.subscribe, averageExclusionsStore.getSnapshot)
+}
+
+// --- mutations ---
+
+export async function createTransactions(entries: NewTransactionInput[]): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert(
+      entries.map((entry) => ({
+        amount_cents: entry.amountCents,
+        category_id: entry.categoryId,
+        date: entry.date,
+        note: entry.note,
+        import_row_index: entry.importRowIndex ?? null,
+      })),
+    )
+    .select('id')
+  if (error) throw error
+  await transactionsStore.refresh()
+  return (data as { id: number }[]).map((row) => row.id)
 }
 
 export async function updateTransaction(
   id: number,
   patch: Partial<Omit<Transaction, 'id' | 'importRowIndex'>>,
 ): Promise<void> {
-  await db.transactions.update(id, patch)
+  const update: Partial<TransactionRow> = {}
+  if (patch.amountCents !== undefined) update.amount_cents = patch.amountCents
+  if (patch.categoryId !== undefined) update.category_id = patch.categoryId
+  if (patch.date !== undefined) update.date = patch.date
+  if (patch.note !== undefined) update.note = patch.note
+
+  const { error } = await supabase.from('transactions').update(update).eq('id', id)
+  if (error) throw error
+  await transactionsStore.refresh()
 }
 
 export async function getTransaction(id: number): Promise<Transaction | undefined> {
-  return db.transactions.get(id)
+  const { data, error } = await supabase.from('transactions').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data ? transactionFromRow(data as TransactionRow) : undefined
 }
 
 export async function deleteTransaction(id: number): Promise<Transaction | undefined> {
-  const existing = await db.transactions.get(id)
+  const existing = await getTransaction(id)
   if (existing) {
-    await db.transactions.delete(id)
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) throw error
+    await transactionsStore.refresh()
   }
   return existing
 }
 
-/** Restores a previously-deleted transaction, preserving its original id and fields (for Undo). */
+/** Restores a previously-deleted transaction (for Undo). The row gets a newly assigned id. */
 export async function restoreTransaction(tx: Transaction): Promise<void> {
-  await db.transactions.put(tx)
+  const { error } = await supabase.from('transactions').insert({
+    amount_cents: tx.amountCents,
+    category_id: tx.categoryId,
+    date: tx.date,
+    note: tx.note,
+    import_row_index: tx.importRowIndex ?? null,
+  })
+  if (error) throw error
+  await transactionsStore.refresh()
 }
 
 export async function deleteTransactions(ids: number[]): Promise<void> {
-  await db.transactions.bulkDelete(ids)
+  if (ids.length === 0) return
+  const { error } = await supabase.from('transactions').delete().in('id', ids)
+  if (error) throw error
+  await transactionsStore.refresh()
 }
 
 export async function getOrCreateCategory(name: string, isDaily: boolean): Promise<number> {
-  const existing = await db.categories.where('name').equals(name).first()
-  if (existing?.id !== undefined) {
-    return existing.id
+  const { data: existing, error: selectError } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('name', name)
+    .maybeSingle()
+  if (selectError) throw selectError
+  if (existing) {
+    return (existing as { id: number }).id
   }
-  return db.categories.add({ name, isDaily })
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name, is_daily: isDaily })
+    .select('id')
+    .single()
+  if (error) throw error
+  await categoriesStore.refresh()
+  return (data as { id: number }).id
 }
 
 export async function setMonthFlag(month: string, isComplete: boolean): Promise<void> {
-  const existing = await db.monthFlags.where('month').equals(month).first()
-  if (existing?.id !== undefined) {
-    await db.monthFlags.update(existing.id, { isComplete })
+  const { data: existing, error: selectError } = await supabase
+    .from('month_flags')
+    .select('id')
+    .eq('month', month)
+    .maybeSingle()
+  if (selectError) throw selectError
+
+  if (existing) {
+    const { error } = await supabase
+      .from('month_flags')
+      .update({ is_complete: isComplete })
+      .eq('id', (existing as { id: number }).id)
+    if (error) throw error
   } else {
-    await db.monthFlags.add({ month, isComplete })
+    const { error } = await supabase
+      .from('month_flags')
+      .insert({ month, is_complete: isComplete })
+    if (error) throw error
   }
+  await monthFlagsStore.refresh()
 }
 
 export async function clearMonthFlag(month: string): Promise<void> {
-  await db.monthFlags.where('month').equals(month).delete()
+  const { error } = await supabase.from('month_flags').delete().eq('month', month)
+  if (error) throw error
+  await monthFlagsStore.refresh()
 }
 
 export async function setExclusion(
@@ -76,20 +279,46 @@ export async function setExclusion(
   month: string,
   reason: string,
 ): Promise<void> {
-  const existing = await db.averageExclusions.where({ categoryId, month }).first()
-  if (existing?.id !== undefined) {
-    await db.averageExclusions.update(existing.id, { reason })
+  const { data: existing, error: selectError } = await supabase
+    .from('average_exclusions')
+    .select('id')
+    .eq('category_id', categoryId)
+    .eq('month', month)
+    .maybeSingle()
+  if (selectError) throw selectError
+
+  if (existing) {
+    const { error } = await supabase
+      .from('average_exclusions')
+      .update({ reason })
+      .eq('id', (existing as { id: number }).id)
+    if (error) throw error
   } else {
-    await db.averageExclusions.add({ categoryId, month, reason })
+    const { error } = await supabase
+      .from('average_exclusions')
+      .insert({ category_id: categoryId, month, reason })
+    if (error) throw error
   }
+  await averageExclusionsStore.refresh()
 }
 
 export async function removeExclusion(categoryId: number, month: string): Promise<void> {
-  await db.averageExclusions.where({ categoryId, month }).delete()
+  const { error } = await supabase
+    .from('average_exclusions')
+    .delete()
+    .eq('category_id', categoryId)
+    .eq('month', month)
+  if (error) throw error
+  await averageExclusionsStore.refresh()
 }
 
 export async function getExistingImportedTransactions(): Promise<Map<number, Transaction>> {
-  const rows = await db.transactions.where('importRowIndex').aboveOrEqual(0).toArray()
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .not('import_row_index', 'is', null)
+  if (error) throw error
+  const rows = (data as TransactionRow[]).map(transactionFromRow)
   return new Map(
     rows
       .filter((r): r is Transaction & { importRowIndex: number } => r.importRowIndex !== undefined)
@@ -98,26 +327,136 @@ export async function getExistingImportedTransactions(): Promise<Map<number, Tra
 }
 
 export async function bulkCreateTransactions(entries: NewTransactionInput[]): Promise<void> {
-  await db.transactions.bulkAdd(entries)
+  if (entries.length === 0) return
+  const { error } = await supabase.from('transactions').insert(
+    entries.map((entry) => ({
+      amount_cents: entry.amountCents,
+      category_id: entry.categoryId,
+      date: entry.date,
+      note: entry.note,
+      import_row_index: entry.importRowIndex ?? null,
+    })),
+  )
+  if (error) throw error
+  await transactionsStore.refresh()
 }
 
 export async function getMaxImportRowIndex(): Promise<number> {
-  const rows = await db.transactions.where('importRowIndex').aboveOrEqual(0).toArray()
-  return rows.reduce((max, r) => Math.max(max, r.importRowIndex ?? -1), -1)
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('import_row_index')
+    .not('import_row_index', 'is', null)
+    .order('import_row_index', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return (data as { import_row_index: number } | null)?.import_row_index ?? -1
 }
 
-export function useCategories(): Category[] {
-  return useLiveQuery(() => db.categories.toArray(), [], []) ?? []
+export interface FullData {
+  categories: Category[]
+  transactions: Transaction[]
+  monthFlags: MonthFlag[]
+  averageExclusions: AverageExclusion[]
 }
 
-export function useTransactions(): Transaction[] {
-  return useLiveQuery(() => db.transactions.toArray(), [], []) ?? []
+export async function getAllData(): Promise<FullData> {
+  const [categories, transactions, monthFlags, averageExclusions] = await Promise.all([
+    loadCategories(),
+    loadTransactions(),
+    loadMonthFlags(),
+    loadAverageExclusions(),
+  ])
+  return { categories, transactions, monthFlags, averageExclusions }
 }
 
-export function useMonthFlags(): MonthFlag[] {
-  return useLiveQuery(() => db.monthFlags.toArray(), [], []) ?? []
+export interface ReplaceAllReport {
+  categories: number
+  transactions: number
+  monthFlags: number
+  averageExclusions: number
 }
 
-export function useExclusions(): AverageExclusion[] {
-  return useLiveQuery(() => db.averageExclusions.toArray(), [], []) ?? []
+/**
+ * Replaces the entire contents of all four tables with the given backup data.
+ * Category/transaction ids are Postgres-assigned on insert (identity columns), so
+ * transaction/exclusion `categoryId` references are remapped from the backup's
+ * original category ids to the newly assigned ones.
+ */
+export async function replaceAllData(data: {
+  categories: Category[]
+  transactions: Transaction[]
+  monthFlags: Omit<MonthFlag, 'id'>[]
+  averageExclusions: Omit<AverageExclusion, 'id'>[]
+}): Promise<ReplaceAllReport> {
+  const del = async (table: string) => {
+    const { error } = await supabase.from(table).delete().gte('id', 0)
+    if (error) throw error
+  }
+  // Children before parents, per the FK "on delete restrict" constraints.
+  await del('average_exclusions')
+  await del('transactions')
+  await del('month_flags')
+  await del('categories')
+
+  const categoryIdMap = new Map<number, number>()
+  for (const category of data.categories) {
+    const { data: inserted, error } = await supabase
+      .from('categories')
+      .insert({
+        name: category.name,
+        is_daily: category.isDaily,
+        is_archived: category.isArchived ?? false,
+        sort_order: category.sortOrder ?? 0,
+      })
+      .select('id')
+      .single()
+    if (error) throw error
+    categoryIdMap.set(category.id, (inserted as { id: number }).id)
+  }
+
+  if (data.transactions.length > 0) {
+    const { error } = await supabase.from('transactions').insert(
+      data.transactions.map((tx) => ({
+        amount_cents: tx.amountCents,
+        category_id: categoryIdMap.get(tx.categoryId) ?? tx.categoryId,
+        date: tx.date,
+        note: tx.note,
+        import_row_index: tx.importRowIndex ?? null,
+      })),
+    )
+    if (error) throw error
+  }
+
+  if (data.monthFlags.length > 0) {
+    const { error } = await supabase.from('month_flags').insert(
+      data.monthFlags.map((flag) => ({ month: flag.month, is_complete: flag.isComplete })),
+    )
+    if (error) throw error
+  }
+
+  if (data.averageExclusions.length > 0) {
+    const { error } = await supabase.from('average_exclusions').insert(
+      data.averageExclusions.map((exclusion) => ({
+        category_id: categoryIdMap.get(exclusion.categoryId) ?? exclusion.categoryId,
+        month: exclusion.month,
+        reason: exclusion.reason,
+      })),
+    )
+    if (error) throw error
+  }
+
+  await Promise.all([
+    categoriesStore.refresh(),
+    transactionsStore.refresh(),
+    monthFlagsStore.refresh(),
+    averageExclusionsStore.refresh(),
+  ])
+
+  return {
+    categories: data.categories.length,
+    transactions: data.transactions.length,
+    monthFlags: data.monthFlags.length,
+    averageExclusions: data.averageExclusions.length,
+  }
 }

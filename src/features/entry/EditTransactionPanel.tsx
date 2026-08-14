@@ -19,7 +19,7 @@ export function EditTransactionPanel({
   onCreateCategory,
   onClose,
 }: EditTransactionPanelProps) {
-  const { showUndoToast } = useToast()
+  const { showUndoToast, showErrorToast } = useToast()
   const [amount, setAmount] = useState(formatCents(transaction.amountCents))
   const [error, setError] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState<number>(transaction.categoryId)
@@ -33,22 +33,30 @@ export function EditTransactionPanel({
       setError(parsed.error)
       return
     }
-    await updateTransaction(transaction.id, {
-      amountCents: parsed.centsPerTerm[0] ?? 0,
-      categoryId: categoryOverride ?? categoryId,
-      date,
-      note,
-    })
-    onClose()
+    try {
+      await updateTransaction(transaction.id, {
+        amountCents: parsed.centsPerTerm[0] ?? 0,
+        categoryId: categoryOverride ?? categoryId,
+        date,
+        note,
+      })
+      onClose()
+    } catch {
+      showErrorToast('Could not save changes')
+    }
   }
 
   async function handleDelete() {
-    const removed = await deleteTransaction(transaction.id)
-    onClose()
-    if (removed) {
-      showUndoToast('Transaction deleted', () => {
-        void restoreTransaction(removed)
-      })
+    try {
+      const removed = await deleteTransaction(transaction.id)
+      onClose()
+      if (removed) {
+        showUndoToast('Transaction deleted', () => {
+          void restoreTransaction(removed)
+        })
+      }
+    } catch {
+      showErrorToast('Could not delete transaction')
     }
   }
 

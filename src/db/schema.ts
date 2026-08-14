@@ -2,6 +2,9 @@ export interface Category {
   id: number
   name: string
   isDaily: boolean
+  /** Optional so existing call sites and fixtures don't all need updating; defaults applied on write/export. */
+  isArchived?: boolean
+  sortOrder?: number
 }
 
 export interface Transaction {

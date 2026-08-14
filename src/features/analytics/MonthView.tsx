@@ -17,6 +17,7 @@ import {
 } from '../../db/repository'
 import { EditTransactionPanel } from '../entry/EditTransactionPanel'
 import { ExpenseEntryForm } from '../entry/ExpenseEntryForm'
+import { useToast } from '../../app/ToastProvider'
 
 function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7)
@@ -43,6 +44,7 @@ export function MonthView() {
   const transactions = useTransactions()
   const exclusions = useExclusions()
   const monthFlags = useMonthFlags()
+  const { showErrorToast } = useToast()
 
   const [month, setMonth] = useState(currentMonthIso())
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -161,24 +163,32 @@ export function MonthView() {
   }
 
   async function toggleExclusion(categoryId: number) {
-    const key = `${categoryId}|${month}`
-    if (exclusionKeys.has(key)) {
-      await removeExclusion(categoryId, month)
-    } else {
-      const reason = window.prompt('Reason for excluding this category-month (optional)') ?? ''
-      await setExclusion(categoryId, month, reason)
+    try {
+      const key = `${categoryId}|${month}`
+      if (exclusionKeys.has(key)) {
+        await removeExclusion(categoryId, month)
+      } else {
+        const reason = window.prompt('Reason for excluding this category-month (optional)') ?? ''
+        await setExclusion(categoryId, month, reason)
+      }
+    } catch {
+      showErrorToast('Could not update exclusion')
     }
   }
 
   async function toggleMonthComplete() {
-    if (monthFlag) {
-      if (monthFlag.isComplete) {
-        await setMonthFlag(month, false)
+    try {
+      if (monthFlag) {
+        if (monthFlag.isComplete) {
+          await setMonthFlag(month, false)
+        } else {
+          await clearMonthFlag(month)
+        }
       } else {
-        await clearMonthFlag(month)
+        await setMonthFlag(month, true)
       }
-    } else {
-      await setMonthFlag(month, true)
+    } catch {
+      showErrorToast('Could not update month status')
     }
   }
 

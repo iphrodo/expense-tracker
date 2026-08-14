@@ -8,12 +8,22 @@ import {
   useMonthFlags,
   useTransactions,
 } from '../../db/repository'
+import { useToast } from '../../app/ToastProvider'
 
 export function AveragesView() {
   const categories = useCategories()
   const transactions = useTransactions()
   const exclusions = useExclusions()
   const monthFlags = useMonthFlags()
+  const { showErrorToast } = useToast()
+
+  async function handleRemoveExclusion(categoryId: number, month: string) {
+    try {
+      await removeExclusion(categoryId, month)
+    } catch {
+      showErrorToast('Could not remove exclusion')
+    }
+  }
 
   const now = useMemo(() => new Date(), [])
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -77,7 +87,7 @@ export function AveragesView() {
               </span>
               <button
                 type="button"
-                onClick={() => void removeExclusion(ex.categoryId, ex.month)}
+                onClick={() => void handleRemoveExclusion(ex.categoryId, ex.month)}
                 className="text-xs text-neutral-500 underline"
               >
                 remove

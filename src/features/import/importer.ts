@@ -1,6 +1,11 @@
 import { parseSeedCsv, CsvParseError } from '../../lib/csv'
-import { db } from '../../db/db'
-import { getExistingImportedTransactions, getOrCreateCategory } from '../../db/repository'
+import {
+  createTransactions,
+  getAllData,
+  getExistingImportedTransactions,
+  getOrCreateCategory,
+  updateTransaction,
+} from '../../db/repository'
 
 export interface ImportOptions {
   expectedRowCount?: number
@@ -42,7 +47,7 @@ export async function importSeedCsv(
   }
 
   const existingByRowIndex = await getExistingImportedTransactions()
-  const existingCategoryNames = new Set((await db.categories.toArray()).map((c) => c.name))
+  const existingCategoryNames = new Set((await getAllData()).categories.map((c) => c.name))
 
   const categoryIdByName = new Map<string, number>()
   let categoriesCreated = 0
@@ -58,40 +63,43 @@ export async function importSeedCsv(
     }
   }
 
-  let transactionsCreated = 0
+  const toCreate: (typeof parsed.rows)[number][] = []
   let transactionsUpdated = 0
 
-  await db.transaction('rw', db.transactions, async () => {
-    for (const row of parsed.rows) {
-      const categoryId = categoryIdByName.get(row.category)
-      if (categoryId === undefined) {
-        throw new CsvParseError(`Line ${row.lineNumber}: category "${row.category}" not created`)
-      }
-      const existing = existingByRowIndex.get(row.rowIndex)
-      if (existing) {
-        await db.transactions.update(existing.id, {
-          amountCents: row.amountCents,
-          categoryId,
-          date: row.date,
-          note: row.note,
-        })
-        transactionsUpdated++
-      } else {
-        await db.transactions.add({
-          amountCents: row.amountCents,
-          categoryId,
-          date: row.date,
-          note: row.note,
-          importRowIndex: row.rowIndex,
-        })
-        transactionsCreated++
-      }
+  for (const row of parsed.rows) {
+    const categoryId = categoryIdByName.get(row.category)
+    if (categoryId === undefined) {
+      throw new CsvParseError(`Line ${row.lineNumber}: category "${row.category}" not created`)
     }
-  })
+    const existing = existingByRowIndex.get(row.rowIndex)
+    if (existing) {
+      await updateTransaction(existing.id, {
+        amountCents: row.amountCents,
+        categoryId,
+        date: row.date,
+        note: row.note,
+      })
+      transactionsUpdated++
+    } else {
+      toCreate.push(row)
+    }
+  }
+
+  if (toCreate.length > 0) {
+    await createTransactions(
+      toCreate.map((row) => ({
+        amountCents: row.amountCents,
+        categoryId: categoryIdByName.get(row.category)!,
+        date: row.date,
+        note: row.note,
+        importRowIndex: row.rowIndex,
+      })),
+    )
+  }
 
   return {
     categoriesCreated,
-    transactionsCreated,
+    transactionsCreated: toCreate.length,
     transactionsUpdated,
   }
 }
