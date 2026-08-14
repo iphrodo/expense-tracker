@@ -88,9 +88,13 @@ export async function removeExclusion(categoryId: number, month: string): Promis
   await db.averageExclusions.where({ categoryId, month }).delete()
 }
 
-export async function getExistingImportRowIndexes(): Promise<Set<number>> {
+export async function getExistingImportedTransactions(): Promise<Map<number, Transaction>> {
   const rows = await db.transactions.where('importRowIndex').aboveOrEqual(0).toArray()
-  return new Set(rows.map((r) => r.importRowIndex).filter((v): v is number => v !== undefined))
+  return new Map(
+    rows
+      .filter((r): r is Transaction & { importRowIndex: number } => r.importRowIndex !== undefined)
+      .map((r) => [r.importRowIndex, r]),
+  )
 }
 
 export async function bulkCreateTransactions(entries: NewTransactionInput[]): Promise<void> {
