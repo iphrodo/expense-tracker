@@ -25,6 +25,8 @@ dist-ssr
 
 # Personal source data (already imported via public/seed/transactions.csv)
 /transactions.csv
+/corrected-transactions.csv
+/expense-tracker-backup-*.json
 
 # Local env vars (Supabase credentials)
 .env

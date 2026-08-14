@@ -94,28 +94,28 @@
 
 ## 8. Deployment
 
-- [ ] 8.1 Create the Vercel project `expense-tracker` (Vite preset, root `./`), connect it to the
+- [x] 8.1 Create the Vercel project `expense-tracker` (Vite preset, root `./`), connect it to the
       GitHub repo's `main` branch for auto-deploy.
-- [ ] 8.2 Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel's project environment
+- [x] 8.2 Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel's project environment
       variables and trigger a deploy (confirm: changing these later requires a new deploy, not just
       a settings save).
-- [ ] 8.3 Confirm the deployed app requires sign-in and, once signed in, reads/writes the shared
+- [x] 8.3 Confirm the deployed app requires sign-in and, once signed in, reads/writes the shared
       Postgres data.
 
 ## 9. Data migration — load tooling
 
-- [ ] 9.1 Write the load script, taking a `data-backup` export file's path as an argument (never
+- [x] 9.1 Write the load script, taking a `data-backup` export file's path as an argument (never
       hardcoded, and never the per-transaction CSV — see the `data-migration` spec): computes row
       count, distinct category count, and amount sum from the file; prints them; writes all four
       tables inside a single Postgres transaction.
-- [ ] 9.2 Add post-write verification to the load script: re-read row count, category count, amount
+- [x] 9.2 Add post-write verification to the load script: re-read row count, category count, amount
       sum, and per-month totals from Postgres; compare each against the figures computed from the
       file (never a hardcoded constant); roll back the transaction on any mismatch and report which
       figure(s) didn't match.
 
 ## 10. Data migration — execution (blocking manual steps)
 
-- [ ] 10.1 **Manual, blocking**: on the machine whose browser holds the authoritative local data,
+- [x] 10.1 **Manual, blocking**: on the machine whose browser holds the authoritative local data,
       use the app's "Export data (backup)" action (built in section 1) to produce a fresh export
       file. This is the migration input — do not substitute the old seed CSV or an export taken
       before section 1 shipped.

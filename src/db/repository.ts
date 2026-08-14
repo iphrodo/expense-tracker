@@ -108,28 +108,45 @@ class TableStore<T> {
   }
 }
 
+// PostgREST caps an unpaginated select() at 1000 rows by default; page through
+// with .range() so tables that grow past that (transactions, in practice) don't
+// get silently truncated.
+const PAGE_SIZE = 1000
+
+async function fetchAllRows<T>(table: string, orderColumn?: string): Promise<T[]> {
+  const rows: T[] = []
+  let from = 0
+  for (;;) {
+    let query = supabase.from(table).select('*').range(from, from + PAGE_SIZE - 1)
+    if (orderColumn) query = query.order(orderColumn)
+    const { data, error } = await query
+    if (error) throw error
+    const batch = (data ?? []) as T[]
+    rows.push(...batch)
+    if (batch.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return rows
+}
+
 async function loadCategories(): Promise<Category[]> {
-  const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-  if (error) throw error
-  return (data as CategoryRow[]).map(categoryFromRow)
+  const rows = await fetchAllRows<CategoryRow>('categories', 'sort_order')
+  return rows.map(categoryFromRow)
 }
 
 async function loadTransactions(): Promise<Transaction[]> {
-  const { data, error } = await supabase.from('transactions').select('*').order('date')
-  if (error) throw error
-  return (data as TransactionRow[]).map(transactionFromRow)
+  const rows = await fetchAllRows<TransactionRow>('transactions', 'date')
+  return rows.map(transactionFromRow)
 }
 
 async function loadMonthFlags(): Promise<MonthFlag[]> {
-  const { data, error } = await supabase.from('month_flags').select('*')
-  if (error) throw error
-  return (data as MonthFlagRow[]).map(monthFlagFromRow)
+  const rows = await fetchAllRows<MonthFlagRow>('month_flags')
+  return rows.map(monthFlagFromRow)
 }
 
 async function loadAverageExclusions(): Promise<AverageExclusion[]> {
-  const { data, error } = await supabase.from('average_exclusions').select('*')
-  if (error) throw error
-  return (data as AverageExclusionRow[]).map(averageExclusionFromRow)
+  const rows = await fetchAllRows<AverageExclusionRow>('average_exclusions')
+  return rows.map(averageExclusionFromRow)
 }
 
 const categoriesStore = new TableStore(loadCategories)
@@ -313,12 +330,21 @@ export async function removeExclusion(categoryId: number, month: string): Promis
 }
 
 export async function getExistingImportedTransactions(): Promise<Map<number, Transaction>> {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .not('import_row_index', 'is', null)
-  if (error) throw error
-  const rows = (data as TransactionRow[]).map(transactionFromRow)
+  const rawRows: TransactionRow[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .not('import_row_index', 'is', null)
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    const batch = (data ?? []) as TransactionRow[]
+    rawRows.push(...batch)
+    if (batch.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  const rows = rawRows.map(transactionFromRow)
   return new Map(
     rows
       .filter((r): r is Transaction & { importRowIndex: number } => r.importRowIndex !== undefined)
