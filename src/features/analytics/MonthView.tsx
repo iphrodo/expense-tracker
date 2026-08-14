@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Transaction } from '../../db/schema'
 import { computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
+import { assignCategoryColors } from '../../lib/categoryColor'
 import { rankCategoriesByRecency } from '../../lib/categoryRanking'
 import { formatCents } from '../../lib/money'
 import {
@@ -46,6 +47,10 @@ export function MonthView() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const categoryColors = useMemo(
+    () => assignCategoryColors(categories.map((c) => c.id)),
+    [categories],
+  )
   const rankedCategories = useMemo(
     () => rankCategoriesByRecency(categories, transactions, new Date()),
     [categories, transactions],
@@ -71,6 +76,26 @@ export function MonthView() {
   }, [monthTransactions, categoryById])
 
   const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
+
+  const categoryBreakdown = useMemo(() => {
+    const daily: { categoryId: number; name: string; subtotalCents: number }[] = []
+    const nonDaily: { categoryId: number; name: string; subtotalCents: number }[] = []
+    for (const [categoryId, txs] of grouped) {
+      const subtotalCents = txs.reduce((sum, tx) => sum + tx.amountCents, 0)
+      const row = { categoryId, name: categoryById.get(categoryId)?.name ?? 'Unknown', subtotalCents }
+      if (categoryById.get(categoryId)?.isDaily) {
+        daily.push(row)
+      } else {
+        nonDaily.push(row)
+      }
+    }
+    return {
+      daily,
+      nonDaily,
+      dailyTotalCents: daily.reduce((sum, row) => sum + row.subtotalCents, 0),
+      nonDailyTotalCents: nonDaily.reduce((sum, row) => sum + row.subtotalCents, 0),
+    }
+  }, [grouped, categoryById])
 
   const namedCategoryAverages = useMemo(
     () => computeNamedCategoryDailyAverages(transactions, categories, month, new Date()),
@@ -287,6 +312,38 @@ export function MonthView() {
               </span>
             </li>
           </ul>
+        </div>
+        <div className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
+          <h2 className="mb-2 text-lg font-semibold">По категоріях</h2>
+          {([
+            { label: 'Щоденні витрати', rows: categoryBreakdown.daily, totalCents: categoryBreakdown.dailyTotalCents },
+            {
+              label: 'Не щоденні витрати',
+              rows: categoryBreakdown.nonDaily,
+              totalCents: categoryBreakdown.nonDailyTotalCents,
+            },
+          ] as const).map((section) => (
+            <div key={section.label} className="mb-3 last:mb-0">
+              <div className="flex items-center justify-between py-1 text-sm font-semibold">
+                <span>{section.label}</span>
+                <span className="font-mono">{formatCents(section.totalCents)}</span>
+              </div>
+              {section.rows.length === 0 && (
+                <p className="py-1 text-xs text-neutral-500">Немає витрат</p>
+              )}
+              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {section.rows.map((row) => (
+                  <li
+                    key={row.categoryId}
+                    className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryColors.get(row.categoryId) ?? ''}`}
+                  >
+                    <span>{row.name}</span>
+                    <span className="font-mono">{formatCents(row.subtotalCents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
 
