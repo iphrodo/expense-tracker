@@ -65,12 +65,26 @@ function transactionFromRow(row: TransactionRow): Transaction {
   }
 }
 
+// `month` columns are Postgres `date` (requires YYYY-MM-DD); the app works with bare YYYY-MM strings.
+function toMonthDate(month: string): string {
+  return month.length === 7 ? `${month}-01` : month
+}
+
+function fromMonthDate(monthDate: string): string {
+  return monthDate.slice(0, 7)
+}
+
 function monthFlagFromRow(row: MonthFlagRow): MonthFlag {
-  return { id: row.id, month: row.month, isComplete: row.is_complete }
+  return { id: row.id, month: fromMonthDate(row.month), isComplete: row.is_complete }
 }
 
 function averageExclusionFromRow(row: AverageExclusionRow): AverageExclusion {
-  return { id: row.id, categoryId: row.category_id, month: row.month, reason: row.reason }
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    month: fromMonthDate(row.month),
+    reason: row.reason,
+  }
 }
 
 // --- small in-memory cache per table, invalidated after each successful write ---
@@ -263,10 +277,11 @@ export async function getOrCreateCategory(name: string, isDaily: boolean): Promi
 }
 
 export async function setMonthFlag(month: string, isComplete: boolean): Promise<void> {
+  const monthDate = toMonthDate(month)
   const { data: existing, error: selectError } = await supabase
     .from('month_flags')
     .select('id')
-    .eq('month', month)
+    .eq('month', monthDate)
     .maybeSingle()
   if (selectError) throw selectError
 
@@ -279,14 +294,14 @@ export async function setMonthFlag(month: string, isComplete: boolean): Promise<
   } else {
     const { error } = await supabase
       .from('month_flags')
-      .insert({ month, is_complete: isComplete })
+      .insert({ month: monthDate, is_complete: isComplete })
     if (error) throw error
   }
   await monthFlagsStore.refresh()
 }
 
 export async function clearMonthFlag(month: string): Promise<void> {
-  const { error } = await supabase.from('month_flags').delete().eq('month', month)
+  const { error } = await supabase.from('month_flags').delete().eq('month', toMonthDate(month))
   if (error) throw error
   await monthFlagsStore.refresh()
 }
@@ -296,11 +311,12 @@ export async function setExclusion(
   month: string,
   reason: string,
 ): Promise<void> {
+  const monthDate = toMonthDate(month)
   const { data: existing, error: selectError } = await supabase
     .from('average_exclusions')
     .select('id')
     .eq('category_id', categoryId)
-    .eq('month', month)
+    .eq('month', monthDate)
     .maybeSingle()
   if (selectError) throw selectError
 
@@ -313,7 +329,7 @@ export async function setExclusion(
   } else {
     const { error } = await supabase
       .from('average_exclusions')
-      .insert({ category_id: categoryId, month, reason })
+      .insert({ category_id: categoryId, month: monthDate, reason })
     if (error) throw error
   }
   await averageExclusionsStore.refresh()
@@ -324,7 +340,7 @@ export async function removeExclusion(categoryId: number, month: string): Promis
     .from('average_exclusions')
     .delete()
     .eq('category_id', categoryId)
-    .eq('month', month)
+    .eq('month', toMonthDate(month))
   if (error) throw error
   await averageExclusionsStore.refresh()
 }
