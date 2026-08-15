@@ -1,10 +1,23 @@
-import { useMemo, useRef, useState, forwardRef, type KeyboardEvent } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type KeyboardEvent,
+} from 'react'
 import type { Category } from '../../db/schema'
-import { FALLBACK_CATEGORY_COLOR } from '../../lib/categoryColor'
+import { getCategoryColorRoles } from '../../lib/categoryColor'
 
 const CHIP_COUNT = 10
 
-interface CategorySelectorProps {
+export interface CategorySelectorHandle {
+  focus: () => void
+}
+
+interface CategoryPickerProps {
   rankedCategories: Category[]
   selectedCategoryId: number | null
   onSelect: (id: number) => void
@@ -21,33 +34,110 @@ function filterByPrefix(categories: Category[], query: string): Category[] {
   return categories.filter((c) => c.name.toLowerCase().startsWith(lower))
 }
 
-export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorProps>(
-  function CategorySelector(
-    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit },
-    typeaheadRef,
+/** Top `CHIP_COUNT` categories by rank, with the selected category promoted to the front if it
+ *  would otherwise fall outside that slice (e.g. just chosen from the "All" picker). */
+export function useCategoryChips(
+  rankedCategories: Category[],
+  selectedCategoryId: number | null,
+): Category[] {
+  return useMemo(() => {
+    const top = rankedCategories.slice(0, CHIP_COUNT)
+    if (selectedCategoryId == null || top.some((c) => c.id === selectedCategoryId)) {
+      return top
+    }
+    const selected = rankedCategories.find((c) => c.id === selectedCategoryId)
+    if (!selected) return top
+    return [selected, ...top.slice(0, CHIP_COUNT - 1)]
+  }, [rankedCategories, selectedCategoryId])
+}
+
+export function CategoryChipsRow({
+  chips,
+  selectedCategoryId,
+  onSelect,
+  scroll = true,
+  className = '',
+}: {
+  chips: Category[]
+  selectedCategoryId: number | null
+  onSelect: (id: number) => void
+  scroll?: boolean
+  className?: string
+}) {
+  return (
+    <div
+      className={`chip-scroll flex gap-1.5 ${scroll ? 'flex-nowrap overflow-x-auto' : 'flex-wrap'} ${className}`}
+      style={scroll ? { maskImage: 'linear-gradient(to right, #000 88%, transparent)' } : undefined}
+    >
+      {chips.map((c) => {
+        const roles = getCategoryColorRoles(c)
+        const selected = c.id === selectedCategoryId
+        return (
+          <button
+            key={c.id}
+            type="button"
+            tabIndex={-1}
+            onClick={() => c.id !== undefined && onSelect(c.id)}
+            style={{
+              backgroundColor: roles.tint,
+              color: roles.text,
+              boxShadow: selected ? `inset 0 0 0 1.5px ${roles.dot}` : undefined,
+            }}
+            className="t-meta h-[30px] flex-none whitespace-nowrap rounded-full px-[11px] font-medium transition-opacity duration-[120ms] ease-out hover:opacity-90"
+          >
+            {c.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+interface CategoryAllPickerProps extends CategoryPickerProps {
+  label: ReactNode
+  className?: string
+}
+
+/** Trigger pill that opens the full searchable category picker (a bottom sheet on mobile,
+ *  a dropdown on desktop via CSS breakpoint), with keyboard nav and inline category creation. */
+export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllPickerProps>(
+  function CategoryAllPicker(
+    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit, label, className = '' },
+    handleRef,
   ) {
-    const [typeaheadQuery, setTypeaheadQuery] = useState('')
+    const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState('')
     const [highlightIndex, setHighlightIndex] = useState(0)
-    const [moreOpen, setMoreOpen] = useState(false)
-    const [moreQuery, setMoreQuery] = useState('')
-    const moreInputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
 
-    const chips = rankedCategories.slice(0, CHIP_COUNT)
-    const typeaheadMatches = useMemo(
-      () => filterByPrefix(rankedCategories, typeaheadQuery),
-      [rankedCategories, typeaheadQuery],
-    )
-    const moreMatches = useMemo(
-      () => filterByPrefix(rankedCategories, moreQuery),
-      [rankedCategories, moreQuery],
-    )
+    const matches = useMemo(() => filterByPrefix(rankedCategories, query), [rankedCategories, query])
 
-    const selectedCategory = rankedCategories.find((c) => c.id === selectedCategoryId)
+    function openPanel() {
+      setOpen(true)
+      setQuery('')
+      setHighlightIndex(0)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
+    function closePanel() {
+      setOpen(false)
+      setQuery('')
+    }
 
-    function handleTypeaheadKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    useImperativeHandle(handleRef, () => ({ focus: openPanel }))
+
+    useEffect(() => {
+      if (!open) return
+      function handleKey(e: globalThis.KeyboardEvent) {
+        if (e.key === 'Escape') closePanel()
+      }
+      document.addEventListener('keydown', handleKey)
+      return () => document.removeEventListener('keydown', handleKey)
+    }, [open])
+
+    function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setHighlightIndex((i) => Math.min(i + 1, Math.max(typeaheadMatches.length - 1, 0)))
+        setHighlightIndex((i) => Math.min(i + 1, Math.max(matches.length - 1, 0)))
         return
       }
       if (e.key === 'ArrowUp') {
@@ -57,10 +147,11 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
       }
       if (e.key === 'Enter') {
         e.preventDefault()
-        const resolved = typeaheadMatches[highlightIndex] ?? typeaheadMatches[0]
-        if (resolved) {
+        const resolved = matches[highlightIndex] ?? matches[0]
+        if (resolved?.id !== undefined) {
           onSelect(resolved.id)
           onSubmit(resolved.id)
+          closePanel()
         } else {
           onSubmit()
         }
@@ -68,116 +159,101 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
     }
 
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              tabIndex={-1}
-              onClick={() => c.id !== undefined && onSelect(c.id)}
-              className={`rounded-full px-3 py-1 text-sm ${c.color ?? FALLBACK_CATEGORY_COLOR} ${
-                c.id === selectedCategoryId
-                  ? 'font-semibold ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-neutral-900'
-                  : 'hover:opacity-80'
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={() => {
-              setMoreOpen((v) => !v)
-              requestAnimationFrame(() => moreInputRef.current?.focus())
-            }}
-            className="rounded-full border border-dashed border-neutral-400 px-3 py-1 text-sm text-neutral-500"
-          >
-            more…
-          </button>
-        </div>
+      <div className={`relative ${className}`}>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => (open ? closePanel() : openPanel())}
+          className="t-meta flex h-[30px] flex-none items-center whitespace-nowrap rounded-full border border-dashed border-border-strong px-[11px] font-medium text-text-2"
+        >
+          {label}
+        </button>
 
-        <div>
-          <input
-            ref={typeaheadRef}
-            type="text"
-            value={typeaheadQuery}
-            onChange={(e) => {
-              setTypeaheadQuery(e.target.value)
-              setHighlightIndex(0)
-            }}
-            onKeyDown={handleTypeaheadKeyDown}
-            placeholder={selectedCategory ? selectedCategory.name : 'Category (type to search)'}
-            aria-label="Category"
-            className="w-full max-w-xs rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          />
-          {typeaheadQuery !== '' && (
-            <ul className="mt-1 max-h-40 max-w-xs divide-y divide-black overflow-auto rounded border border-neutral-200 text-sm dark:border-neutral-700">
-              {typeaheadMatches.map((c, i) => (
-                <li
-                  key={c.id}
-                  className={`px-2 py-1 ${c.color ?? FALLBACK_CATEGORY_COLOR} ${
-                    i === highlightIndex ? 'ring-2 ring-inset ring-emerald-500' : ''
-                  }`}
-                >
-                  {c.name}
-                </li>
-              ))}
-              {typeaheadMatches.length === 0 && (
-                <li className="px-2 py-1 text-neutral-400">No match</li>
-              )}
-            </ul>
-          )}
-        </div>
-
-        {moreOpen && (
-          <div className="rounded border border-neutral-200 p-2 dark:border-neutral-700">
-            <input
-              ref={moreInputRef}
-              type="text"
-              value={moreQuery}
-              onChange={(e) => setMoreQuery(e.target.value)}
-              placeholder="Search all categories"
-              className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            />
-            <ul className="mt-2 max-h-48 divide-y divide-black overflow-auto text-sm">
-              {moreMatches.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (c.id !== undefined) {
-                        onSelect(c.id)
-                      }
-                      setMoreOpen(false)
-                      setMoreQuery('')
-                    }}
-                    className={`w-full rounded px-2 py-1 text-left hover:opacity-80 ${c.color ?? 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
-                  >
-                    {c.name}
-                  </button>
-                </li>
-              ))}
-              {moreQuery.trim() !== '' && moreMatches.length === 0 && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const id = await onCreateCategory(moreQuery.trim())
-                      onSelect(id)
-                      setMoreOpen(false)
-                      setMoreQuery('')
-                    }}
-                    className="w-full rounded px-2 py-1 text-left text-emerald-600 hover:bg-neutral-100 dark:text-emerald-400 dark:hover:bg-neutral-800"
-                  >
-                    Create "{moreQuery.trim()}"
-                  </button>
-                </li>
-              )}
-            </ul>
-          </div>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={closePanel} />
+            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] rounded-t-lg border border-border bg-surface p-s3 shadow-2 min-[900px]:absolute min-[900px]:inset-x-auto min-[900px]:right-0 min-[900px]:bottom-auto min-[900px]:top-[calc(100%+8px)] min-[900px]:max-h-96 min-[900px]:w-80 min-[900px]:rounded-lg">
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setHighlightIndex(0)
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search categories"
+                aria-label="Search categories"
+                className="h-11 w-full rounded-sm border border-border px-s2 text-sm text-text"
+              />
+              <ul className="mt-s2 max-h-64 divide-y divide-border overflow-auto text-sm">
+                {matches.map((c, i) => {
+                  const roles = getCategoryColorRoles(c)
+                  return (
+                    <li
+                      key={c.id}
+                      style={{ backgroundColor: i === highlightIndex ? roles.tint : undefined }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (c.id !== undefined) onSelect(c.id)
+                          closePanel()
+                        }}
+                        className="flex w-full items-center gap-s2 rounded-sm px-s2 py-s2 text-left hover:opacity-80"
+                      >
+                        <span
+                          aria-hidden
+                          className="size-2 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: roles.dot,
+                            boxShadow: c.id === selectedCategoryId ? `0 0 0 2px ${roles.dot}55` : undefined,
+                          }}
+                        />
+                        <span style={{ color: roles.text }}>{c.name}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+                {query.trim() !== '' && matches.length === 0 && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const id = await onCreateCategory(query.trim())
+                        onSelect(id)
+                        closePanel()
+                      }}
+                      className="w-full rounded-sm px-s2 py-s2 text-left text-accent hover:bg-surface-2"
+                    >
+                      Create "{query.trim()}"
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          </>
         )}
+      </div>
+    )
+  },
+)
+
+/** Convenience wrapper combining the chip row and the "All categories" picker in a single
+ *  wrapping flex row, for contexts (e.g. the edit-transaction modal) that don't need the
+ *  entry form's responsive multi-row layout. */
+export const CategorySelector = forwardRef<CategorySelectorHandle, CategoryPickerProps>(
+  function CategorySelector(props, handleRef) {
+    const chips = useCategoryChips(props.rankedCategories, props.selectedCategoryId)
+    return (
+      <div className="flex flex-wrap items-center gap-s2">
+        <CategoryChipsRow
+          chips={chips}
+          selectedCategoryId={props.selectedCategoryId}
+          onSelect={props.onSelect}
+          scroll={false}
+        />
+        <CategoryAllPicker ref={handleRef} {...props} label="All categories" />
       </div>
     )
   },

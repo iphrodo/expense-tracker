@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Transaction } from '../../db/schema'
 import { computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
 import { rankCategoriesByCount } from '../../lib/categoryRanking'
 import { formatCents } from '../../lib/money'
+import { getCategoryColorRoles } from '../../lib/categoryColor'
 import {
   getOrCreateCategory,
   removeExclusion,
@@ -24,20 +25,123 @@ function currentMonthIso(): string {
 }
 
 const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'Січень',
+  'Лютий',
+  'Березень',
+  'Квітень',
+  'Травень',
+  'Червень',
+  'Липень',
+  'Серпень',
+  'Вересень',
+  'Жовтень',
+  'Листопад',
+  'Грудень',
 ]
 
+function formatDayHeader(dateIso: string): string {
+  const d = new Date(dateIso + 'T00:00:00')
+  return d.toLocaleDateString('uk-UA', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+interface MonthPickerProps {
+  selectedYear: number
+  selectedMonthIndex: number
+  years: number[]
+  monthIndexesByYear: Map<number, number[]>
+  onPick: (year: number, monthIndex: number) => void
+}
+
+function MonthPicker({ selectedYear, selectedMonthIndex, years, monthIndexesByYear, onPick }: MonthPickerProps) {
+  const [open, setOpen] = useState(false)
+  const [viewYear, setViewYear] = useState(selectedYear)
+
+  useEffect(() => {
+    if (open) setViewYear(selectedYear)
+  }, [open, selectedYear])
+
+  const yearIndex = years.indexOf(viewYear)
+  const availableMonths = new Set(monthIndexesByYear.get(viewYear) ?? [])
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="t-meta h-9 rounded-full border border-border bg-surface px-s3 font-semibold text-text hover:bg-surface-2"
+      >
+        {MONTH_NAMES[selectedMonthIndex]} {selectedYear}
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close month picker"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div className="absolute z-20 mt-s2 w-64 rounded-lg border border-border bg-surface p-s3 shadow-2 transition-[opacity,transform] duration-[220ms] [transition-timing-function:cubic-bezier(.2,.8,.2,1)]">
+            <div className="mb-s2 flex items-center justify-between">
+              <button
+                type="button"
+                disabled={yearIndex <= 0}
+                onClick={() => setViewYear(years[yearIndex - 1]!)}
+                className="t-body h-8 w-8 rounded-md text-text-2 hover:bg-surface-2 disabled:opacity-30"
+                aria-label="Previous year"
+              >
+                ‹
+              </button>
+              <span className="t-body font-semibold text-text">{viewYear}</span>
+              <button
+                type="button"
+                disabled={yearIndex === -1 || yearIndex >= years.length - 1}
+                onClick={() => setViewYear(years[yearIndex + 1]!)}
+                className="t-body h-8 w-8 rounded-md text-text-2 hover:bg-surface-2 disabled:opacity-30"
+                aria-label="Next year"
+              >
+                ›
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-s1">
+              {MONTH_NAMES.map((name, index) => {
+                const available = availableMonths.has(index)
+                const active = viewYear === selectedYear && index === selectedMonthIndex
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    disabled={!available}
+                    onClick={() => {
+                      onPick(viewYear, index)
+                      setOpen(false)
+                    }}
+                    className={`t-meta h-9 rounded-md ${
+                      active
+                        ? 'bg-accent-weak font-semibold text-accent-text'
+                        : available
+                          ? 'text-text hover:bg-surface-2'
+                          : 'text-text-3 opacity-40'
+                    }`}
+                  >
+                    {name.slice(0, 3)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+type BreakdownRow = { categoryId: number; name: string; subtotalCents: number }
+
+function sortRows(rows: BreakdownRow[]): BreakdownRow[] {
+  return [...rows].sort((a, b) => b.subtotalCents - a.subtotalCents)
+}
 
 export function MonthView() {
   const categories = useCategories()
@@ -72,19 +176,42 @@ export function MonthView() {
   }, [monthTransactions])
 
   const dateGroups = useMemo(() => {
-    const groups: { date: string; txs: Transaction[] }[] = []
+    const groups: { date: string; txs: Transaction[]; totalCents: number }[] = []
     for (const tx of sortedTransactions) {
       const last = groups[groups.length - 1]
       if (last && last.date === tx.date) {
         last.txs.push(tx)
+        last.totalCents += tx.amountCents
       } else {
-        groups.push({ date: tx.date, txs: [tx] })
+        groups.push({ date: tx.date, txs: [tx], totalCents: tx.amountCents })
       }
     }
     return groups
   }, [sortedTransactions])
 
   const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
+
+  const seenTxIds = useRef<Set<number> | null>(null)
+  const [freshTxIds, setFreshTxIds] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    const currentIds = new Set(transactions.map((tx) => tx.id))
+    if (seenTxIds.current === null) {
+      seenTxIds.current = currentIds
+      return
+    }
+    const added = [...currentIds].filter((id) => !seenTxIds.current!.has(id))
+    seenTxIds.current = currentIds
+    if (added.length === 0) return
+    setFreshTxIds((prev) => new Set([...prev, ...added]))
+    const timer = setTimeout(() => {
+      setFreshTxIds((prev) => {
+        const next = new Set(prev)
+        for (const id of added) next.delete(id)
+        return next
+      })
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [transactions])
 
   const categoryGroups = useMemo(() => {
     const map = new Map<number, Transaction[]>()
@@ -93,16 +220,12 @@ export function MonthView() {
       list.push(tx)
       map.set(tx.categoryId, list)
     }
-    return [...map.entries()].sort((a, b) => {
-      const nameA = categoryById.get(a[0])?.name ?? ''
-      const nameB = categoryById.get(b[0])?.name ?? ''
-      return nameA.localeCompare(nameB)
-    })
-  }, [monthTransactions, categoryById])
+    return [...map.entries()]
+  }, [monthTransactions])
 
   const categoryBreakdown = useMemo(() => {
-    const daily: { categoryId: number; name: string; subtotalCents: number }[] = []
-    const nonDaily: { categoryId: number; name: string; subtotalCents: number }[] = []
+    const daily: BreakdownRow[] = []
+    const nonDaily: BreakdownRow[] = []
     for (const [categoryId, txs] of categoryGroups) {
       const subtotalCents = txs.reduce((sum, tx) => sum + tx.amountCents, 0)
       const row = { categoryId, name: categoryById.get(categoryId)?.name ?? 'Unknown', subtotalCents }
@@ -164,7 +287,6 @@ export function MonthView() {
   )
 
   const years = availableYears.length > 0 ? availableYears : [selectedYear]
-  const monthIndexesForSelectedYear = monthIndexesByYear.get(selectedYear) ?? [selectedMonthIndex]
 
   useEffect(() => {
     if (monthsWithData.length > 0 && !monthsWithData.includes(month)) {
@@ -174,12 +296,6 @@ export function MonthView() {
 
   function updateMonth(year: number, monthIndex: number) {
     setMonth(`${year}-${String(monthIndex + 1).padStart(2, '0')}`)
-  }
-
-  function handleYearChange(newYear: number) {
-    const indexes = monthIndexesByYear.get(newYear) ?? []
-    const newIndex = indexes.includes(selectedMonthIndex) ? selectedMonthIndex : (indexes[0] ?? 0)
-    updateMonth(newYear, newIndex)
   }
 
   async function confirmExclusionDialog(reason: string) {
@@ -213,155 +329,183 @@ export function MonthView() {
     }
   }
 
+  const dailyShare = monthSummary.totalCents === 0 ? 0 : (monthSummary.dailyCents / monthSummary.totalCents) * 100
+  const nonDailyShare = 100 - dailyShare
+
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 p-4 [grid-template-areas:'form'_'sidebar'_'rest'] lg:grid-cols-[1fr_20rem] lg:items-start lg:[grid-template-areas:'form_sidebar'_'rest_sidebar']">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-s5 p-s4 [grid-template-areas:'form'_'rest'_'sidebar'] md:[grid-template-areas:'form_sidebar'_'rest_sidebar'] md:grid-cols-[1.4fr_360px] md:items-start">
       <div className="[grid-area:form]">
         <ExpenseEntryForm />
       </div>
 
-      <div className="flex flex-col gap-4 [grid-area:rest]">
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={selectedMonthIndex}
-            onChange={(e) => updateMonth(selectedYear, Number(e.target.value))}
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            {monthIndexesForSelectedYear.map((index) => (
-              <option key={index} value={index}>
-                {MONTH_NAMES[index]}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedYear}
-            onChange={(e) => handleYearChange(Number(e.target.value))}
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            {years.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void toggleMonthComplete()}
-            className="rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700"
-          >
-            {monthFlag ? (monthFlag.isComplete ? 'Marked complete' : 'Marked incomplete') : 'Mark complete/incomplete'}
-          </button>
-          <span className="text-lg font-semibold sm:ml-auto">
-            Total: {formatCents(monthTotal)}
-          </span>
+      <div className="flex flex-col gap-s4 [grid-area:rest]">
+        <div className="flex flex-wrap items-end justify-between gap-s3">
+          <div className="flex flex-wrap items-center gap-s2">
+            <MonthPicker
+              selectedYear={selectedYear}
+              selectedMonthIndex={selectedMonthIndex}
+              years={years}
+              monthIndexesByYear={monthIndexesByYear}
+              onPick={updateMonth}
+            />
+            <button
+              type="button"
+              onClick={() => void toggleMonthComplete()}
+              className={`t-meta h-9 rounded-full px-s3 font-semibold transition-colors duration-[120ms] ease-out ${
+                monthFlag?.isComplete === false
+                  ? 'bg-accent-weak text-accent-text'
+                  : monthFlag?.isComplete
+                    ? 'bg-surface-2 text-text-2'
+                    : 'bg-surface-2 text-text-2 hover:text-text'
+              }`}
+            >
+              {monthFlag ? (monthFlag.isComplete ? 'Marked complete' : 'Marked incomplete') : 'Mark complete/incomplete'}
+            </button>
+          </div>
+          <div className="text-right">
+            <div className="t-micro text-text-3">TOTAL</div>
+            <div className="t-num-lg text-text">{formatCents(monthTotal)}</div>
+          </div>
         </div>
 
-        {dateGroups.length === 0 && <p className="text-neutral-500">No transactions this month.</p>}
+        {dateGroups.length === 0 && (
+          <p className="t-body py-s5 text-center text-text-2">No transactions this month.</p>
+        )}
 
         {dateGroups.map((group) => (
           <div key={group.date}>
-            <h3 className="mb-1 text-sm font-semibold text-neutral-500">{group.date}</h3>
-            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {group.txs.map((tx) => (
-                <li key={tx.id}>
+            <div className="flex items-center justify-between px-s1 pb-s2">
+              <span className="t-meta font-semibold text-text-2">{formatDayHeader(group.date)}</span>
+              <span className="t-meta tabular-amount text-text-2">{formatCents(group.totalCents)}</span>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-1">
+              {group.txs.map((tx, i) => {
+                const roles = getCategoryColorRoles(categoryById.get(tx.categoryId))
+                return (
                   <button
+                    key={tx.id}
                     type="button"
                     onClick={() => setEditingTx(tx)}
-                    className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:opacity-80 ${categoryById.get(tx.categoryId)?.color ?? ''}`}
+                    className={`flex h-12 w-full items-center gap-s3 px-s3 text-left transition-colors duration-[120ms] ease-out hover:bg-surface-2 ${
+                      i > 0 ? 'border-t border-border' : ''
+                    } ${freshTxIds.has(tx.id) ? 'animate-row-in' : ''}`}
                   >
-                    <span>
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: roles.dot }}
+                    />
+                    <span className="t-body min-w-0 flex-1 truncate text-text">
                       {categoryById.get(tx.categoryId)?.name ?? 'Unknown'}
-                      {tx.note && <span className="ml-2 opacity-70">{tx.note}</span>}
+                      {tx.note && <span className="ml-s2 text-text-3">{tx.note}</span>}
                     </span>
-                    <span className="font-mono">{formatCents(tx.amountCents)}</span>
+                    <span className="t-num shrink-0 text-text">{formatCents(tx.amountCents)}</span>
                   </button>
-                </li>
-              ))}
-            </ul>
+                )
+              })}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="flex w-full flex-col gap-4 [grid-area:sidebar]">
-        <div className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
-          <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            <li className="flex items-center justify-between py-1 text-sm font-semibold">
-              <span>Всього</span>
-              <span className="font-mono">{formatCents(monthSummary.totalCents)}</span>
-            </li>
-            <li className="flex items-center justify-between py-1 text-sm">
-              <span>Не щоденні витрати всього</span>
-              <span className="font-mono">{formatCents(monthSummary.nonDailyCents)}</span>
-            </li>
-            <li className="flex items-center justify-between py-1 text-sm">
-              <span>Щоденні витрати всього</span>
-              <span className="font-mono">{formatCents(monthSummary.dailyCents)}</span>
-            </li>
-            <li className="flex items-center justify-between py-1 text-sm">
-              <span>Щоденні витрати на 1 день</span>
-              <span className="font-mono">{formatCents(monthSummary.dailyRateCents)}</span>
-            </li>
-            <li className="flex items-center justify-between py-1 text-sm">
-              <span>Щоденні витрати (місяць)</span>
-              <span className="font-mono">{formatCents(monthSummary.projectedCents)}</span>
-            </li>
-          </ul>
+      <div className="flex w-full flex-col gap-s5 [grid-area:sidebar]">
+        <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+          <div className="t-micro text-text-3">Всього</div>
+          <div className="t-display mt-1 text-text">{formatCents(monthSummary.totalCents)}</div>
+          <div className="mt-s4 flex h-2 overflow-hidden rounded-full">
+            <div className="h-full bg-accent" style={{ width: `${dailyShare}%` }} />
+            <div className="h-full bg-surface-2" style={{ width: `${nonDailyShare}%` }} />
+          </div>
+          <div className="mt-s3 flex flex-col gap-s2">
+            <div className="flex items-center gap-s2">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-accent" />
+              <span className="t-meta text-text-2">Щоденні витрати всього</span>
+              <span className="t-num ml-auto text-text">{formatCents(monthSummary.dailyCents)}</span>
+            </div>
+            <div className="flex items-center gap-s2">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-surface-2" />
+              <span className="t-meta text-text-2">Не щоденні витрати всього</span>
+              <span className="t-num ml-auto text-text">{formatCents(monthSummary.nonDailyCents)}</span>
+            </div>
+          </div>
+          <div className="mt-s4 flex gap-s3 border-t border-border pt-s3">
+            <div className="flex-1">
+              <div className="t-num-lg text-text">{formatCents(monthSummary.dailyRateCents)}</div>
+              <div className="t-micro mt-0.5 text-text-3">Щоденні витрати на 1 день</div>
+            </div>
+            <div className="flex-1">
+              <div className="t-num-lg text-text">{formatCents(monthSummary.projectedCents)}</div>
+              <div className="t-micro mt-0.5 text-text-3">Щоденні витрати (місяць)</div>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
-          <h2 className="mb-2 text-lg font-semibold">Детально</h2>
-          <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {namedCategoryAverages.map((row) => (
-              <li key={row.label} className="flex items-center justify-between py-1 text-sm">
-                <span>{row.label} за 1 день</span>
-                <span className="font-mono">
-                  {row.dailyRateCents === 0 ? '—' : formatCents(row.dailyRateCents)}
-                </span>
-              </li>
-            ))}
-            <li className="flex items-center justify-between py-1 text-sm font-semibold">
-              <span>Разом</span>
-              <span className="font-mono">
-                {formatCents(namedCategoryAverages.reduce((sum, row) => sum + row.dailyRateCents, 0))}
+        <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+          <h2 className="t-h2 mb-s3 text-text">Детально</h2>
+          {namedCategoryAverages.map((row) => (
+            <div key={row.label} className="flex items-center justify-between border-b border-border py-s2">
+              <span className="t-meta text-text-2">{row.label} за 1 день</span>
+              <span className="t-num text-text">
+                {row.dailyRateCents === 0 ? '—' : formatCents(row.dailyRateCents)}
               </span>
-            </li>
-          </ul>
+            </div>
+          ))}
+          <div className="flex items-center justify-between pt-s3">
+            <span className="t-body font-semibold text-text">Разом</span>
+            <span className="t-body font-semibold text-text">
+              {formatCents(namedCategoryAverages.reduce((sum, row) => sum + row.dailyRateCents, 0))}
+            </span>
+          </div>
         </div>
-        <div className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
-          <h2 className="mb-2 text-lg font-semibold">По категоріях</h2>
-          {([
-            { label: 'Щоденні витрати', rows: categoryBreakdown.daily, totalCents: categoryBreakdown.dailyTotalCents },
-            {
-              label: 'Не щоденні витрати',
-              rows: categoryBreakdown.nonDaily,
-              totalCents: categoryBreakdown.nonDailyTotalCents,
-            },
-          ] as const).map((section) => (
-            <div key={section.label} className="mb-3 last:mb-0">
-              <div className="flex items-center justify-between py-1 text-sm font-semibold">
-                <span>{section.label}</span>
-                <span className="font-mono">{formatCents(section.totalCents)}</span>
-              </div>
-              {section.rows.length === 0 && (
-                <p className="py-1 text-xs text-neutral-500">Немає витрат</p>
-              )}
-              <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {section.rows.map((row) => {
+
+        <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+          <h2 className="t-h2 mb-s3 text-text">По категоріях</h2>
+          {(
+            [
+              {
+                key: 'daily' as const,
+                label: 'Щоденні витрати',
+                rows: categoryBreakdown.daily,
+                totalCents: categoryBreakdown.dailyTotalCents,
+              },
+              {
+                key: 'nonDaily' as const,
+                label: 'Не щоденні витрати',
+                rows: categoryBreakdown.nonDaily,
+                totalCents: categoryBreakdown.nonDailyTotalCents,
+              },
+            ] as const
+          ).map((section) => {
+            const rows = sortRows(section.rows)
+            const sectionMax = section.totalCents === 0 ? 0 : section.totalCents
+            return (
+              <div key={section.label} className="mb-s3 last:mb-0">
+                <div className="flex items-center justify-between pb-s2">
+                  <span className="t-micro text-text-3">{section.label}</span>
+                  <span className="t-meta tabular-amount text-text-2">{formatCents(section.totalCents)}</span>
+                </div>
+                {rows.length === 0 && <p className="py-s2 text-xs text-text-3">Немає витрат</p>}
+                {rows.map((row) => {
                   const excluded = exclusionKeys.has(`${row.categoryId}|${month}`)
+                  const roles = getCategoryColorRoles(categoryById.get(row.categoryId))
+                  const share = sectionMax === 0 ? 0 : (row.subtotalCents / sectionMax) * 100
                   return (
-                    <li
-                      key={row.categoryId}
-                      className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryById.get(row.categoryId)?.color ?? ''}`}
-                    >
-                      <span>
-                        {row.name}
-                        {excluded && (
-                          <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                            excluded from averages
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono">{formatCents(row.subtotalCents)}</span>
+                    <div key={row.categoryId} className="group py-s2">
+                      <div className="flex items-center gap-s2">
+                        <span
+                          aria-hidden
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: roles.dot }}
+                        />
+                        <span className="t-body min-w-0 flex-1 truncate text-text">
+                          {row.name}
+                          {excluded && (
+                            <span className="ml-s2 rounded-sm bg-surface-2 px-s1 py-0.5 text-xs text-text-2">
+                              excluded from averages
+                            </span>
+                          )}
+                        </span>
+                        <span className="t-num text-text">{formatCents(row.subtotalCents)}</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -372,17 +516,23 @@ export function MonthView() {
                           }
                           aria-label={excluded ? 'Include in averages' : 'Exclude from averages'}
                           title={excluded ? 'Include in averages' : 'Exclude from averages'}
-                          className="rounded px-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+                          className="rounded-sm px-1 text-xs text-text-3 opacity-0 transition-opacity duration-[120ms] ease-out group-hover:opacity-100 hover:text-text focus-visible:opacity-100"
                         >
                           {excluded ? '↩' : '⊘'}
                         </button>
-                      </span>
-                    </li>
+                      </div>
+                      <div className="mt-s2 h-[3px] rounded-full bg-surface-2">
+                        <div
+                          className="h-[3px] rounded-full"
+                          style={{ width: `${share}%`, backgroundColor: roles.dot }}
+                        />
+                      </div>
+                    </div>
                   )
                 })}
-              </ul>
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       </div>
 

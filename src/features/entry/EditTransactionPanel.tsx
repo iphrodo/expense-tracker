@@ -4,7 +4,7 @@ import { parseAmountExpression } from '../../lib/expressionParser'
 import { formatCents } from '../../lib/money'
 import { deleteTransaction, restoreTransaction, updateTransaction } from '../../db/repository'
 import { useToast } from '../../app/ToastProvider'
-import { CategorySelector } from './CategorySelector'
+import { CategorySelector, type CategorySelectorHandle } from './CategorySelector'
 
 interface EditTransactionPanelProps {
   transaction: Transaction
@@ -25,7 +25,7 @@ export function EditTransactionPanel({
   const [categoryId, setCategoryId] = useState<number>(transaction.categoryId)
   const [date, setDate] = useState(transaction.date)
   const [note, setNote] = useState(transaction.note)
-  const typeaheadRef = useRef<HTMLInputElement>(null)
+  const typeaheadRef = useRef<CategorySelectorHandle>(null)
 
   async function handleSave(categoryOverride?: number) {
     const parsed = parseAmountExpression(amount, { editMode: true })
@@ -61,24 +61,24 @@ export function EditTransactionPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl dark:bg-neutral-900">
-        <h2 className="mb-3 text-lg font-semibold">Edit transaction</h2>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-s4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-s4 shadow-2">
+        <h2 className="t-h2 mb-s3 text-text">Edit transaction</h2>
 
         <input
           type="text"
-          inputMode="text"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => {
             setAmount(e.target.value)
             if (error) setError(null)
           }}
           aria-label="Amount"
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-xl dark:border-neutral-700 dark:bg-neutral-800"
+          className="t-display tabular-amount h-14 w-full rounded-md border border-border-strong bg-surface px-s3 text-text focus:border-accent"
         />
-        {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+        {error && <p className="mt-1 text-sm text-error">{error}</p>}
 
-        <div className="mt-3">
+        <div className="mt-s3">
           <CategorySelector
             ref={typeaheadRef}
             rankedCategories={rankedCategories}
@@ -93,7 +93,7 @@ export function EditTransactionPanel({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-3 rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-800"
+          className="mt-s3 h-11 rounded-sm border border-border-strong bg-surface px-s2 text-text"
         />
 
         <input
@@ -102,29 +102,29 @@ export function EditTransactionPanel({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Note (optional)"
           aria-label="Note"
-          className="mt-3 w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+          className="mt-s3 h-11 w-full rounded-sm border border-border px-s3 text-sm text-text placeholder:text-text-3"
         />
 
-        <div className="mt-4 flex justify-between">
+        <div className="mt-s4 flex justify-between">
           <button
             type="button"
             onClick={() => void handleDelete()}
-            className="rounded px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            className="t-body h-11 rounded-md px-s3 font-semibold text-error hover:bg-error-weak"
           >
             Delete
           </button>
-          <div className="flex gap-2">
+          <div className="flex gap-s2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded px-3 py-2 text-sm text-neutral-600 dark:text-neutral-300"
+              className="t-body h-11 rounded-md px-s3 text-text-2 hover:text-text"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={() => void handleSave()}
-              className="rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
             >
               Save
             </button>

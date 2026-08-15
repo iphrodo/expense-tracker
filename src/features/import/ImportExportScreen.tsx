@@ -116,10 +116,12 @@ export function ImportExportScreen() {
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-4">
-      <div>
-        <h2 className="mb-2 text-lg font-semibold">Export data (backup)</h2>
-        <p className="mb-2 text-sm text-neutral-500">
+    <div className="mx-auto flex max-w-xl flex-col gap-s5 p-s4">
+      <h1 className="t-h1 text-text">Import / Export</h1>
+
+      <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+        <h2 className="t-h2 mb-s2 text-text">Export data (backup)</h2>
+        <p className="t-meta mb-s3 text-text-2">
           Downloads every category, transaction, month flag, and average exclusion as a single
           JSON file — the only export that captures everything. Use this for backups; use CSV
           below only for viewing transactions in a spreadsheet.
@@ -127,15 +129,15 @@ export function ImportExportScreen() {
         <button
           type="button"
           onClick={() => void handleBackupExport()}
-          className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-500"
+          className="t-body h-11 rounded-md bg-accent px-s4 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
         >
           Export data (backup)
         </button>
       </div>
 
-      <div>
-        <h2 className="mb-2 text-lg font-semibold">Import a backup</h2>
-        <p className="mb-2 text-sm text-neutral-500">
+      <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+        <h2 className="t-h2 mb-s2 text-text">Import a backup</h2>
+        <p className="t-meta mb-s3 text-text-2">
           Pick a JSON file produced by "Export data (backup)". This{' '}
           <strong>replaces all data currently stored in this browser</strong> with the file's
           contents.
@@ -146,18 +148,25 @@ export function ImportExportScreen() {
           disabled={backupImporting}
           onChange={(e) => void handleBackupFilePicked(e)}
           data-testid="backup-import-file-input"
-          className="text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-200 file:px-3 file:py-1.5 file:font-semibold file:text-neutral-900 dark:file:bg-neutral-700 dark:file:text-neutral-100"
+          className="t-meta text-text-2 file:mr-3 file:h-9 file:rounded-md file:border-0 file:bg-surface-2 file:px-s3 file:font-semibold file:text-text"
         />
         {backupStatus && (
-          <p className="mt-2 text-sm" data-testid="backup-import-status">
+          <p
+            className={`t-meta mt-s2 ${
+              backupStatus.startsWith('Import failed')
+                ? 'rounded-sm bg-error-weak px-s2 py-s1 text-error'
+                : 'text-text-2'
+            }`}
+            data-testid="backup-import-status"
+          >
             {backupStatus}
           </p>
         )}
       </div>
 
-      <div>
-        <h2 className="mb-2 text-lg font-semibold">Re-import a corrected file</h2>
-        <p className="mb-2 text-sm text-neutral-500">
+      <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+        <h2 className="t-h2 mb-s2 text-text">Re-import a corrected file</h2>
+        <p className="t-meta mb-s3 text-text-2">
           Pick a CSV file from disk in the same format as export. Rows whose{' '}
           <code>row_index</code> already exists overwrite that transaction's amount, date,
           category, and note; new <code>row_index</code> values are added as new transactions.
@@ -168,18 +177,23 @@ export function ImportExportScreen() {
           disabled={importing}
           onChange={(e) => void handleFilePicked(e)}
           data-testid="import-file-input"
-          className="text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-200 file:px-3 file:py-1.5 file:font-semibold file:text-neutral-900 dark:file:bg-neutral-700 dark:file:text-neutral-100"
+          className="t-meta text-text-2 file:mr-3 file:h-9 file:rounded-md file:border-0 file:bg-surface-2 file:px-s3 file:font-semibold file:text-text"
         />
         {status && (
-          <p className="mt-2 text-sm" data-testid="import-status">
+          <p
+            className={`t-meta mt-s2 ${
+              status.startsWith('Import failed') ? 'rounded-sm bg-error-weak px-s2 py-s1 text-error' : 'text-text-2'
+            }`}
+            data-testid="import-status"
+          >
             {status}
           </p>
         )}
       </div>
 
-      <div>
-        <h2 className="mb-2 text-lg font-semibold">Export transactions (CSV)</h2>
-        <p className="mb-2 text-sm text-neutral-500">
+      <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+        <h2 className="t-h2 mb-s2 text-text">Export transactions (CSV)</h2>
+        <p className="t-meta mb-s3 text-text-2">
           Downloads all {transactions.length} transactions as CSV, in the same shape as import.
           Transactions only — does not include month flags or average exclusions. For a full
           backup, use "Export data (backup)" above.
@@ -187,7 +201,7 @@ export function ImportExportScreen() {
         <button
           type="button"
           onClick={handleExport}
-          className="rounded border border-neutral-300 px-4 py-2 font-semibold dark:border-neutral-700"
+          className="t-body h-11 rounded-md border border-border-strong px-s4 font-semibold text-text hover:bg-surface-2"
         >
           Export transactions (CSV)
         </button>
