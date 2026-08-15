@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../lib/supabase'
+import { colorForIndex } from '../lib/categoryColor'
 import type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
 
 export type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
@@ -20,6 +21,7 @@ interface CategoryRow {
   is_daily: boolean
   is_archived: boolean
   sort_order: number
+  color: string
 }
 
 interface TransactionRow {
@@ -51,6 +53,7 @@ function categoryFromRow(row: CategoryRow): Category {
     isDaily: row.is_daily,
     isArchived: row.is_archived,
     sortOrder: row.sort_order,
+    color: row.color,
   }
 }
 
@@ -260,20 +263,35 @@ export async function getOrCreateCategory(name: string, isDaily: boolean): Promi
     .from('categories')
     .select('id')
     .eq('name', name)
+    .eq('is_archived', false)
     .maybeSingle()
   if (selectError) throw selectError
   if (existing) {
     return (existing as { id: number }).id
   }
 
+  // Round-robin by current category count (including archived, so the sequence is monotonic
+  // and each new color slot is never reused out of order within a session).
+  const { count, error: countError } = await supabase
+    .from('categories')
+    .select('*', { count: 'exact', head: true })
+  if (countError) throw countError
+
   const { data, error } = await supabase
     .from('categories')
-    .insert({ name, is_daily: isDaily })
+    .insert({ name, is_daily: isDaily, color: colorForIndex(count ?? 0) })
     .select('id')
     .single()
   if (error) throw error
   await categoriesStore.refresh()
   return (data as { id: number }).id
+}
+
+/** Soft-deletes a category: it's archived, keeping its history intact, but never offered again for selection. */
+export async function archiveCategory(id: number): Promise<void> {
+  const { error } = await supabase.from('categories').update({ is_archived: true }).eq('id', id)
+  if (error) throw error
+  await categoriesStore.refresh()
 }
 
 export async function setMonthFlag(month: string, isComplete: boolean): Promise<void> {
@@ -442,7 +460,7 @@ export async function replaceAllData(data: {
   await del('categories')
 
   const categoryIdMap = new Map<number, number>()
-  for (const category of data.categories) {
+  for (const [index, category] of data.categories.entries()) {
     const { data: inserted, error } = await supabase
       .from('categories')
       .insert({
@@ -450,6 +468,8 @@ export async function replaceAllData(data: {
         is_daily: category.isDaily,
         is_archived: category.isArchived ?? false,
         sort_order: category.sortOrder ?? 0,
+        // Falls back to a round-robin assignment for backups predating stored colors.
+        color: category.color ?? colorForIndex(index),
       })
       .select('id')
       .single()

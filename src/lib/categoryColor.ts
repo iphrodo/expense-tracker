@@ -24,11 +24,15 @@ const PALETTE = [
 ]
 
 /**
- * Assigns each category id a color, guaranteeing distinct colors across all ids as long as
- * their count doesn't exceed the palette size (ids beyond that wrap and repeat). Order is by
- * id ascending, which is stable across renders/sessions since ids don't change.
+ * Picks the palette entry for the given round-robin index (e.g. the count of categories that
+ * existed before this one, including archived ones). Called once at category creation time
+ * (and at migration backfill time); the result is stored on the category row and never
+ * recomputed, so it's independent of any other category being archived/deleted/created.
  */
-export function assignCategoryColors(categoryIds: Iterable<number>): Map<number, string> {
-  const sortedIds = [...new Set(categoryIds)].sort((a, b) => a - b)
-  return new Map(sortedIds.map((id, index) => [id, PALETTE[index % PALETTE.length]!]))
+export function colorForIndex(index: number): string {
+  return PALETTE[index % PALETTE.length]!
 }
+
+/** Fallback for categories that predate stored colors or lack one for any other reason. */
+export const FALLBACK_CATEGORY_COLOR =
+  'border border-neutral-300 text-neutral-700 dark:border-neutral-700 dark:text-neutral-300'

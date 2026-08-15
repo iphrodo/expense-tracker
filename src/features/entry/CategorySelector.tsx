@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, forwardRef, type KeyboardEvent } from 'react'
 import type { Category } from '../../db/schema'
-import { assignCategoryColors } from '../../lib/categoryColor'
+import { FALLBACK_CATEGORY_COLOR } from '../../lib/categoryColor'
 
 const CHIP_COUNT = 10
 
@@ -32,10 +32,6 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
     const [moreQuery, setMoreQuery] = useState('')
     const moreInputRef = useRef<HTMLInputElement>(null)
 
-    const categoryColors = useMemo(
-      () => assignCategoryColors(rankedCategories.map((c) => c.id)),
-      [rankedCategories],
-    )
     const chips = rankedCategories.slice(0, CHIP_COUNT)
     const typeaheadMatches = useMemo(
       () => filterByPrefix(rankedCategories, typeaheadQuery),
@@ -80,7 +76,7 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
               type="button"
               tabIndex={-1}
               onClick={() => c.id !== undefined && onSelect(c.id)}
-              className={`rounded-full px-3 py-1 text-sm ${categoryColors.get(c.id) ?? 'border border-neutral-300 text-neutral-700 dark:border-neutral-700 dark:text-neutral-300'} ${
+              className={`rounded-full px-3 py-1 text-sm ${c.color ?? FALLBACK_CATEGORY_COLOR} ${
                 c.id === selectedCategoryId
                   ? 'font-semibold ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-neutral-900'
                   : 'hover:opacity-80'
@@ -121,7 +117,7 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
               {typeaheadMatches.map((c, i) => (
                 <li
                   key={c.id}
-                  className={`px-2 py-1 ${categoryColors.get(c.id) ?? ''} ${
+                  className={`px-2 py-1 ${c.color ?? FALLBACK_CATEGORY_COLOR} ${
                     i === highlightIndex ? 'ring-2 ring-inset ring-emerald-500' : ''
                   }`}
                 >
@@ -157,7 +153,7 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
                       setMoreOpen(false)
                       setMoreQuery('')
                     }}
-                    className={`w-full rounded px-2 py-1 text-left hover:opacity-80 ${categoryColors.get(c.id) ?? 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
+                    className={`w-full rounded px-2 py-1 text-left hover:opacity-80 ${c.color ?? 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
                   >
                     {c.name}
                   </button>

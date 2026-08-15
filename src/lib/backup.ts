@@ -9,6 +9,8 @@ export interface BackupCategory {
   isDaily: boolean
   isArchived: boolean
   sortOrder: number
+  /** Optional so backups from before stored colors still parse; restore falls back to a default. */
+  color?: string
 }
 
 export interface BackupTransaction {
@@ -66,6 +68,7 @@ export function buildBackup(
       isDaily: c.isDaily,
       isArchived: c.isArchived ?? false,
       sortOrder: c.sortOrder ?? 0,
+      ...(c.color !== undefined ? { color: c.color } : {}),
     })),
     transactions: transactions.map((t) => ({
       id: t.id,
