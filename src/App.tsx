@@ -22,43 +22,58 @@ function App() {
   return (
     <ToastProvider>
       <AuthGate>
-        <div className="min-h-svh bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-          {screen === 'month' ? (
-            <MonthView />
-          ) : screen === 'averages' ? (
-            <AveragesView />
-          ) : screen === 'categories' ? (
-            <CategoriesScreen />
-          ) : (
-            <ImportExportScreen />
-          )}
+        <div className="min-h-svh bg-bg text-text">
+          <header className="sticky top-0 z-30 hidden h-14 items-center gap-s5 border-b border-border bg-surface px-s6 md:flex">
+            <span className="t-body font-bold text-text">Витрати</span>
+            <div className="inline-flex gap-0.5 rounded-full bg-surface-2 p-[3px]">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setScreen(item.id)}
+                  className={`t-body h-9 rounded-full px-s3 font-semibold transition-colors duration-[120ms] ease-out ${
+                    screen === item.id ? 'bg-surface text-text shadow-1' : 'text-text-2 hover:text-text'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void supabase.auth.signOut()}
+              className="t-meta ml-auto text-text-3 hover:text-text-2"
+            >
+              Sign out
+            </button>
+          </header>
 
-          <nav className="fixed bottom-0 left-0 right-0 flex items-center justify-center gap-1 border-t border-neutral-200 bg-white/95 p-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95">
+          <main className="pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
+            {screen === 'month' ? (
+              <MonthView />
+            ) : screen === 'averages' ? (
+              <AveragesView />
+            ) : screen === 'categories' ? (
+              <CategoriesScreen />
+            ) : (
+              <ImportExportScreen />
+            )}
+          </main>
+
+          <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                tabIndex={-1}
                 onClick={() => setScreen(item.id)}
-                className={`rounded px-3 py-1 text-sm ${
-                  screen === item.id
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                className={`t-micro flex h-11 min-w-11 flex-1 items-center justify-center normal-case ${
+                  screen === item.id ? 'font-semibold text-accent' : 'text-text-3'
                 }`}
               >
                 {item.label}
               </button>
             ))}
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => void supabase.auth.signOut()}
-              className="absolute right-2 rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-600 dark:text-neutral-600 dark:hover:text-neutral-400"
-            >
-              Sign out
-            </button>
           </nav>
-          <div className="h-14" />
         </div>
       </AuthGate>
     </ToastProvider>

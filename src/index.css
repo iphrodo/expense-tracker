@@ -1,9 +1,154 @@
 @import 'tailwindcss';
 
+@theme {
+  /* Neutrals */
+  --color-bg: #fbfbfa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f4f2;
+  --color-border: #e7e7e3;
+  --color-border-strong: #d6d6d1;
+  --color-text: #16181a;
+  --color-text-2: #5c6166;
+  --color-text-3: #8b9096;
+
+  /* Accent (single accent color) */
+  --color-accent: #0e8a5f;
+  --color-accent-hover: #0b7350;
+  --color-accent-press: #095f42;
+  --color-accent-weak: #e6f4ee;
+  --color-accent-text: #076046;
+
+  /* Error */
+  --color-error: #b42318;
+  --color-error-weak: #fef3f2;
+
+  /* Radius scale (overrides Tailwind defaults so rounded-sm/md/lg match tokens) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Spacing scale (4pt grid, additive tokens: p-s1, gap-s2, etc.) */
+  --spacing-s1: 4px;
+  --spacing-s2: 8px;
+  --spacing-s3: 12px;
+  --spacing-s4: 16px;
+  --spacing-s5: 24px;
+  --spacing-s6: 32px;
+  --spacing-s7: 48px;
+
+  /* Shadow scale */
+  --shadow-1: 0 1px 2px rgba(16, 18, 20, 0.04), 0 1px 1px rgba(16, 18, 20, 0.03);
+  --shadow-2: 0 8px 24px rgba(16, 18, 20, 0.08);
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+/* Type scale utilities — every amount/label in the app draws from these. */
+@layer utilities {
+  .t-display {
+    font-size: 32px;
+    line-height: 36px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .t-h1 {
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .t-h2 {
+    font-size: 17px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+  .t-body {
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 450;
+  }
+  .t-num {
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-num-lg {
+    font-size: 20px;
+    line-height: 26px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-meta {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 500;
+  }
+  .t-micro {
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .tabular-amount {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Focus styling: single accent-colored ring everywhere, replacing the browser default. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-in {
+  animation: row-in 200ms ease-out;
+}
+
+/* Hides the scrollbar on the horizontally-scrolling category chip row while keeping it scrollable. */
+.chip-scroll {
+  scrollbar-width: none;
+}
+.chip-scroll::-webkit-scrollbar {
+  display: none;
 }
