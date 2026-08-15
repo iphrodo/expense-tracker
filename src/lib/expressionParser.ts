@@ -193,7 +193,7 @@ export interface ParseOptions {
 }
 
 export function parseAmountExpression(input: string, options: ParseOptions = {}): ParseResult {
-  const trimmed = input.trim()
+  const trimmed = input.trim().replace(/,/g, '.')
   if (trimmed === '') {
     return { ok: false, error: 'Enter an amount' }
   }

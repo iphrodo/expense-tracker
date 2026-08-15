@@ -67,7 +67,7 @@ export function EditTransactionPanel({
 
         <input
           type="text"
-          inputMode="decimal"
+          inputMode="text"
           value={amount}
           onChange={(e) => {
             setAmount(e.target.value)
