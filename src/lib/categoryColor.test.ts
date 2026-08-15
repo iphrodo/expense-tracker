@@ -20,4 +20,13 @@ describe('assignCategoryColors', () => {
     expect(() => assignCategoryColors(ids)).not.toThrow()
     expect(assignCategoryColors(ids).size).toBe(ids.length)
   })
+
+  it('never assigns adjacent ids the same hue family', () => {
+    const ids = Array.from({ length: 17 }, (_, i) => i + 1)
+    const colors = [...assignCategoryColors(ids).values()]
+    const hueFamily = (cls: string) => cls.match(/bg-(\w+)-100/)?.[1]
+    for (let i = 1; i < colors.length; i++) {
+      expect(hueFamily(colors[i]!)).not.toBe(hueFamily(colors[i - 1]!))
+    }
+  })
 })

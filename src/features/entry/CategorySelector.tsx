@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, forwardRef, type KeyboardEvent } from 'react'
 import type { Category } from '../../db/schema'
+import { assignCategoryColors } from '../../lib/categoryColor'
 
 const CHIP_COUNT = 10
 
@@ -31,6 +32,10 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
     const [moreQuery, setMoreQuery] = useState('')
     const moreInputRef = useRef<HTMLInputElement>(null)
 
+    const categoryColors = useMemo(
+      () => assignCategoryColors(rankedCategories.map((c) => c.id)),
+      [rankedCategories],
+    )
     const chips = rankedCategories.slice(0, CHIP_COUNT)
     const typeaheadMatches = useMemo(
       () => filterByPrefix(rankedCategories, typeaheadQuery),
@@ -75,10 +80,10 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
               type="button"
               tabIndex={-1}
               onClick={() => c.id !== undefined && onSelect(c.id)}
-              className={`rounded-full border px-3 py-1 text-sm ${
+              className={`rounded-full px-3 py-1 text-sm ${categoryColors.get(c.id) ?? 'border border-neutral-300 text-neutral-700 dark:border-neutral-700 dark:text-neutral-300'} ${
                 c.id === selectedCategoryId
-                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'border-neutral-300 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                  ? 'font-semibold ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-neutral-900'
+                  : 'hover:opacity-80'
               }`}
             >
               {c.name}
@@ -112,11 +117,13 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
             className="w-full max-w-xs rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
           />
           {typeaheadQuery !== '' && (
-            <ul className="mt-1 max-h-40 max-w-xs overflow-auto rounded border border-neutral-200 text-sm dark:border-neutral-700">
+            <ul className="mt-1 max-h-40 max-w-xs divide-y divide-black overflow-auto rounded border border-neutral-200 text-sm dark:border-neutral-700">
               {typeaheadMatches.map((c, i) => (
                 <li
                   key={c.id}
-                  className={i === highlightIndex ? 'bg-emerald-500/10' : ''}
+                  className={`px-2 py-1 ${categoryColors.get(c.id) ?? ''} ${
+                    i === highlightIndex ? 'ring-2 ring-inset ring-emerald-500' : ''
+                  }`}
                 >
                   {c.name}
                 </li>
@@ -138,7 +145,7 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
               placeholder="Search all categories"
               className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
-            <ul className="mt-2 max-h-48 overflow-auto text-sm">
+            <ul className="mt-2 max-h-48 divide-y divide-black overflow-auto text-sm">
               {moreMatches.map((c) => (
                 <li key={c.id}>
                   <button
@@ -150,7 +157,7 @@ export const CategorySelector = forwardRef<HTMLInputElement, CategorySelectorPro
                       setMoreOpen(false)
                       setMoreQuery('')
                     }}
-                    className="w-full rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    className={`w-full rounded px-2 py-1 text-left hover:opacity-80 ${categoryColors.get(c.id) ?? 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
                   >
                     {c.name}
                   </button>
