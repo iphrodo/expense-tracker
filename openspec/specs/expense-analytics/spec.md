@@ -10,15 +10,15 @@ touching the write path that entry depends on.
 
 ### Requirement: Expense entry form appears at the top of the Month view's main content
 The Month view's main content column SHALL render the expense entry form (amount, category
-selector, date, optional note, save) as its first element, above the category-grouped transaction
-list, for whichever month is currently selected. The right sidebar (summary block, "Детально",
-"По категоріях") SHALL be unaffected by this placement and SHALL continue to render exactly as it
-did before the entry form was embedded.
+selector, date, optional note, save) as its first element, above the flat, date-grouped
+transaction list, for whichever month is currently selected. The right sidebar (summary block,
+"Детально", "По категоріях") SHALL be unaffected by this placement and SHALL continue to render
+exactly as it did before the entry form was embedded.
 
 #### Scenario: Entry form renders above the transaction list
 - **WHEN** the Month view is rendered for any selected month
-- **THEN** the expense entry form appears at the top of the main content column, and the
-  category-grouped transaction list for that month appears below it
+- **THEN** the expense entry form appears at the top of the main content column, and the flat
+  transaction list for that month appears below it
 
 #### Scenario: Sidebar is unchanged by the merge
 - **WHEN** the Month view is rendered with the entry form embedded
@@ -31,22 +31,47 @@ did before the entry form was embedded.
 - **THEN** the transaction is saved with the entry form's own date (defaulting to today per the
   expense-entry date-persistence requirement), not silently backdated to the month being viewed
 
-### Requirement: Month view groups transactions by category with a total
-The system SHALL provide a month view that lists every transaction recorded for a given month,
-grouped by category, and SHALL show a total across all transactions in that month. The view
-SHALL include transactions in categories that are excluded from averages for that month, and
-SHALL visually mark such category-months as excluded rather than hiding them.
+### Requirement: Month view lists transactions in reverse-chronological order, grouped by date
+The Month view's main content SHALL list every transaction recorded for the selected month as a
+flat list sorted by date descending (most recent first), with transactions sharing the same date
+sorted by a stable secondary key (e.g. id) so their relative order does not change between
+renders. The list SHALL be visually grouped under date headers rather than category headers, and
+SHALL show a total across all transactions in that month.
 
-#### Scenario: All transactions appear regardless of exclusion
-- **WHEN** a category has an active `AverageExclusion` for the viewed month and also has
-  transactions recorded in that month
-- **THEN** those transactions still appear in the month view, grouped under that category, marked
-  as excluded, and included in the displayed category subtotal and month total
+#### Scenario: Transactions render newest date first
+- **WHEN** the selected month has transactions dated `2026-08-04`, `2026-08-10`, and `2026-08-12`
+- **THEN** the `2026-08-12` transactions render first, followed by `2026-08-10`, followed by
+  `2026-08-04`
+
+#### Scenario: List is grouped by date, not by category
+- **WHEN** the selected month has transactions from multiple categories dated `2026-08-04`
+- **THEN** those transactions appear together under a single `2026-08-04` date group, regardless
+  of which categories they belong to
 
 #### Scenario: Month total sums all recorded transactions
 - **WHEN** the month view is opened for a month with N transactions across multiple categories
-- **THEN** the displayed total equals the sum of all N transaction amounts, including excluded
-  categories
+- **THEN** the displayed total equals the sum of all N transaction amounts, including transactions
+  in excluded category-months
+
+#### Scenario: Each row is tinted by its category's color
+- **WHEN** the flat transaction list renders a transaction in category "Продукти"
+- **THEN** that row is rendered using the same deterministic color assigned to "Продукти" in the
+  "По категоріях" sidebar breakdown
+
+#### Scenario: Clicking a row opens the edit panel
+- **WHEN** the user clicks a transaction row in the flat list
+- **THEN** the transaction edit panel opens for that transaction, same as clicking a row did in the
+  previous category-grouped list
+
+### Requirement: Excluded category-months remain visible in the flat transaction list
+Transactions belonging to a category-month with an active `AverageExclusion` SHALL still appear in
+the flat transaction list, in their normal date position, rather than being hidden or moved.
+
+#### Scenario: Excluded category's transactions still appear in date order
+- **WHEN** category A has an active `AverageExclusion` for the viewed month and also has a
+  transaction dated `2026-08-10` in that month
+- **THEN** that transaction still appears in the flat list under the `2026-08-10` date group,
+  included in the month total
 
 ### Requirement: Averages are computed with a per-category divisor
 The averages view SHALL compute, for each category, an average monthly spend using a divisor
@@ -180,16 +205,45 @@ refresh the app.
 - **THEN** the averages view, if open, recomputes and displays the updated average without a page
   reload
 
-### Requirement: Exclusions are managed from the month view and listed in the averages view
-Each category row in the month view SHALL include a toggle to create or remove an
-`AverageExclusion` for that category and the viewed month, with an optional free-text reason. The
-averages view SHALL list all currently active exclusions and SHALL allow removing any of them.
+### Requirement: Exclusions are managed from the month view's sidebar breakdown, with a confirmation dialog
+Each category row in the "По категоріях" sidebar breakdown SHALL include an icon-button to create
+or remove an `AverageExclusion` for that category and the viewed month. Clicking it SHALL open a
+confirmation dialog with a free-text reason field rather than applying the change immediately. The
+main transaction list SHALL NOT provide its own exclude/include control. The averages view SHALL
+continue to list all currently active exclusions and SHALL allow removing any of them.
 
-#### Scenario: Toggling exclusion from month view creates an AverageExclusion
-- **WHEN** the user toggles exclusion on for category A in the month view for month `2026-06`,
-  optionally entering a reason
+#### Scenario: Exclude icon opens a confirmation dialog
+- **WHEN** the user clicks the exclude icon on a not-yet-excluded category row in the "По
+  категоріях" breakdown for month `2026-06`
+- **THEN** a confirmation dialog opens with an empty reason field, and no `AverageExclusion` is
+  created until the user confirms
+
+#### Scenario: Confirming exclude creates an AverageExclusion with the entered reason
+- **WHEN** the user, in the exclude confirmation dialog for category A and month `2026-06`, enters
+  a reason and confirms
 - **THEN** an `AverageExclusion` record is created with `categoryId` = A, `month` = `2026-06`, and
-  the given reason (if any), unique on `(categoryId, month)`
+  the entered reason, unique on `(categoryId, month)`
+
+#### Scenario: Include icon opens a confirmation dialog pre-filled with the existing reason
+- **WHEN** the user clicks the include icon on an already-excluded category row for category A and
+  month `2026-06`, where the active `AverageExclusion` has reason "one-time bulk purchase"
+- **THEN** a confirmation dialog opens showing "one-time bulk purchase" in the reason field, and
+  the `AverageExclusion` is not removed until the user confirms
+
+#### Scenario: Confirming include removes the AverageExclusion
+- **WHEN** the user confirms the include dialog for category A and month `2026-06`
+- **THEN** the `AverageExclusion` for `(A, 2026-06)` is removed and category A's average
+  recomputes to include that month
+
+#### Scenario: Dismissing the dialog makes no change
+- **WHEN** the user opens either the exclude or include confirmation dialog and then closes it
+  without confirming (e.g. via a cancel action)
+- **THEN** no `AverageExclusion` is created, modified, or removed
+
+#### Scenario: Main transaction list has no exclude control
+- **WHEN** the flat transaction list is rendered for any month
+- **THEN** no row or grouping in that list offers an exclude/include control; exclusion is only
+  reachable from the "По категоріях" sidebar breakdown
 
 #### Scenario: Averages view lists and allows removing an active exclusion
 - **WHEN** an `AverageExclusion` exists for category A and month `2026-06`
@@ -328,8 +382,9 @@ SHALL order its colors so that any two categories assigned adjacent positions in
 have visually distinct hues, rather than ordering colors as a continuous hue progression (e.g.
 consecutive same-family shades like amber/yellow/lime) that makes neighboring categories hard to
 tell apart at a glance. Any other part of the system that renders a category with a color (such as
-the entry form's category chips and search) SHALL use this same color mapping, so a given category
-always displays with the same color everywhere it appears colored.
+the entry form's category chips and search, and each row of the main transaction list) SHALL use
+this same color mapping, so a given category always displays with the same color everywhere it
+appears colored.
 
 #### Scenario: Same category renders with the same color across months
 - **WHEN** category "Продукти" is displayed in the breakdown block for two different selected
@@ -349,6 +404,11 @@ always displays with the same color everywhere it appears colored.
 
 #### Scenario: Same category shows the same color in the entry form and the sidebar
 - **WHEN** category "Продукти" is displayed both as a quick-access chip in the entry form and as a
+  row in the sidebar breakdown block
+- **THEN** both renderings use the same color from the palette
+
+#### Scenario: Same category shows the same color in the main transaction list
+- **WHEN** category "Продукти" is displayed both as a row in the main transaction list and as a
   row in the sidebar breakdown block
 - **THEN** both renderings use the same color from the palette
 </content>

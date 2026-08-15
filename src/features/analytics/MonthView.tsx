@@ -18,6 +18,7 @@ import {
 import { EditTransactionPanel } from '../entry/EditTransactionPanel'
 import { ExpenseEntryForm } from '../entry/ExpenseEntryForm'
 import { useToast } from '../../app/ToastProvider'
+import { ConfirmDialog } from './ConfirmDialog'
 
 function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7)
@@ -48,6 +49,9 @@ export function MonthView() {
 
   const [month, setMonth] = useState(currentMonthIso())
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [exclusionDialog, setExclusionDialog] = useState<
+    { categoryId: number; mode: 'exclude' | 'include' } | null
+  >(null)
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const categoryColors = useMemo(
@@ -64,7 +68,29 @@ export function MonthView() {
     [transactions, month],
   )
 
-  const grouped = useMemo(() => {
+  const sortedTransactions = useMemo(() => {
+    return [...monthTransactions].sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1
+      return b.id - a.id
+    })
+  }, [monthTransactions])
+
+  const dateGroups = useMemo(() => {
+    const groups: { date: string; txs: Transaction[] }[] = []
+    for (const tx of sortedTransactions) {
+      const last = groups[groups.length - 1]
+      if (last && last.date === tx.date) {
+        last.txs.push(tx)
+      } else {
+        groups.push({ date: tx.date, txs: [tx] })
+      }
+    }
+    return groups
+  }, [sortedTransactions])
+
+  const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
+
+  const categoryGroups = useMemo(() => {
     const map = new Map<number, Transaction[]>()
     for (const tx of monthTransactions) {
       const list = map.get(tx.categoryId) ?? []
@@ -78,12 +104,10 @@ export function MonthView() {
     })
   }, [monthTransactions, categoryById])
 
-  const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
-
   const categoryBreakdown = useMemo(() => {
     const daily: { categoryId: number; name: string; subtotalCents: number }[] = []
     const nonDaily: { categoryId: number; name: string; subtotalCents: number }[] = []
-    for (const [categoryId, txs] of grouped) {
+    for (const [categoryId, txs] of categoryGroups) {
       const subtotalCents = txs.reduce((sum, tx) => sum + tx.amountCents, 0)
       const row = { categoryId, name: categoryById.get(categoryId)?.name ?? 'Unknown', subtotalCents }
       if (categoryById.get(categoryId)?.isDaily) {
@@ -98,7 +122,7 @@ export function MonthView() {
       dailyTotalCents: daily.reduce((sum, row) => sum + row.subtotalCents, 0),
       nonDailyTotalCents: nonDaily.reduce((sum, row) => sum + row.subtotalCents, 0),
     }
-  }, [grouped, categoryById])
+  }, [categoryGroups, categoryById])
 
   const namedCategoryAverages = useMemo(
     () => computeNamedCategoryDailyAverages(transactions, categories, month, new Date()),
@@ -162,15 +186,16 @@ export function MonthView() {
     updateMonth(newYear, newIndex)
   }
 
-  async function toggleExclusion(categoryId: number) {
+  async function confirmExclusionDialog(reason: string) {
+    if (!exclusionDialog) return
+    const { categoryId, mode } = exclusionDialog
     try {
-      const key = `${categoryId}|${month}`
-      if (exclusionKeys.has(key)) {
-        await removeExclusion(categoryId, month)
-      } else {
-        const reason = window.prompt('Reason for excluding this category-month (optional)') ?? ''
+      if (mode === 'exclude') {
         await setExclusion(categoryId, month, reason)
+      } else {
+        await removeExclusion(categoryId, month)
       }
+      setExclusionDialog(null)
     } catch {
       showErrorToast('Could not update exclusion')
     }
@@ -234,53 +259,30 @@ export function MonthView() {
           </span>
         </div>
 
-        {grouped.length === 0 && <p className="text-neutral-500">No transactions this month.</p>}
+        {dateGroups.length === 0 && <p className="text-neutral-500">No transactions this month.</p>}
 
-        {grouped.map(([categoryId, txs]) => {
-          const subtotal = txs.reduce((sum, tx) => sum + tx.amountCents, 0)
-          const excluded = exclusionKeys.has(`${categoryId}|${month}`)
-          return (
-            <div key={categoryId} className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">
-                  {categoryById.get(categoryId)?.name ?? 'Unknown'}
-                  {excluded && (
-                    <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                      excluded from averages
-                    </span>
-                  )}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono">{formatCents(subtotal)}</span>
+        {dateGroups.map((group) => (
+          <div key={group.date}>
+            <h3 className="mb-1 text-sm font-semibold text-neutral-500">{group.date}</h3>
+            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {group.txs.map((tx) => (
+                <li key={tx.id}>
                   <button
                     type="button"
-                    onClick={() => void toggleExclusion(categoryId)}
-                    className="text-xs text-neutral-500 underline"
+                    onClick={() => setEditingTx(tx)}
+                    className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:opacity-80 ${categoryColors.get(tx.categoryId) ?? ''}`}
                   >
-                    {excluded ? 'include' : 'exclude'}
+                    <span>
+                      {categoryById.get(tx.categoryId)?.name ?? 'Unknown'}
+                      {tx.note && <span className="ml-2 opacity-70">{tx.note}</span>}
+                    </span>
+                    <span className="font-mono">{formatCents(tx.amountCents)}</span>
                   </button>
-                </div>
-              </div>
-              <ul className="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800">
-                {txs.map((tx) => (
-                  <li key={tx.id}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTx(tx)}
-                      className="flex w-full items-center justify-between py-1 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                    >
-                      <span>
-                        {tx.date}
-                        {tx.note && <span className="ml-2 text-neutral-400">{tx.note}</span>}
-                      </span>
-                      <span className="font-mono">{formatCents(tx.amountCents)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )
-        })}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
 
       <div className="flex w-full flex-col gap-4 [grid-area:sidebar]">
@@ -347,15 +349,41 @@ export function MonthView() {
                 <p className="py-1 text-xs text-neutral-500">Немає витрат</p>
               )}
               <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {section.rows.map((row) => (
-                  <li
-                    key={row.categoryId}
-                    className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryColors.get(row.categoryId) ?? ''}`}
-                  >
-                    <span>{row.name}</span>
-                    <span className="font-mono">{formatCents(row.subtotalCents)}</span>
-                  </li>
-                ))}
+                {section.rows.map((row) => {
+                  const excluded = exclusionKeys.has(`${row.categoryId}|${month}`)
+                  return (
+                    <li
+                      key={row.categoryId}
+                      className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryColors.get(row.categoryId) ?? ''}`}
+                    >
+                      <span>
+                        {row.name}
+                        {excluded && (
+                          <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                            excluded from averages
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono">{formatCents(row.subtotalCents)}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExclusionDialog({
+                              categoryId: row.categoryId,
+                              mode: excluded ? 'include' : 'exclude',
+                            })
+                          }
+                          aria-label={excluded ? 'Include in averages' : 'Exclude from averages'}
+                          title={excluded ? 'Include in averages' : 'Exclude from averages'}
+                          className="rounded px-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+                        >
+                          {excluded ? '↩' : '⊘'}
+                        </button>
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}
@@ -368,6 +396,21 @@ export function MonthView() {
           rankedCategories={rankedCategories}
           onCreateCategory={(name) => getOrCreateCategory(name, false)}
           onClose={() => setEditingTx(null)}
+        />
+      )}
+
+      {exclusionDialog && (
+        <ConfirmDialog
+          title={exclusionDialog.mode === 'exclude' ? 'Exclude category from averages' : 'Include category in averages'}
+          initialReason={
+            exclusionDialog.mode === 'include'
+              ? (exclusions.find(
+                  (e) => e.categoryId === exclusionDialog.categoryId && e.month === month,
+                )?.reason ?? '')
+              : ''
+          }
+          onConfirm={(reason) => void confirmExclusionDialog(reason)}
+          onClose={() => setExclusionDialog(null)}
         />
       )}
     </div>
