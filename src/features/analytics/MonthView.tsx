@@ -193,10 +193,12 @@ export function MonthView() {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 lg:flex-row lg:items-start">
-      <div className="flex flex-1 flex-col gap-4">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 p-4 [grid-template-areas:'form'_'sidebar'_'rest'] lg:grid-cols-[1fr_20rem] lg:items-start lg:[grid-template-areas:'form_sidebar'_'rest_sidebar']">
+      <div className="[grid-area:form]">
         <ExpenseEntryForm />
+      </div>
 
+      <div className="flex flex-col gap-4 [grid-area:rest]">
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={selectedMonthIndex}
@@ -281,7 +283,7 @@ export function MonthView() {
         })}
       </div>
 
-      <div className="flex w-full shrink-0 flex-col gap-4 lg:w-80">
+      <div className="flex w-full flex-col gap-4 [grid-area:sidebar]">
         <div className="rounded border border-neutral-200 p-3 dark:border-neutral-700">
           <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
             <li className="flex items-center justify-between py-1 text-sm font-semibold">
