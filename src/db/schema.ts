@@ -5,6 +5,8 @@ export interface Category {
   /** Optional so existing call sites and fixtures don't all need updating; defaults applied on write/export. */
   isArchived?: boolean
   sortOrder?: number
+  /** Assigned once at creation, stored, never recomputed. Optional for the same reason as the fields above. */
+  color?: string
 }
 
 export interface Transaction {

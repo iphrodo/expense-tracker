@@ -1,29 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { assignCategoryColors } from './categoryColor'
+import { colorForIndex } from './categoryColor'
 
-describe('assignCategoryColors', () => {
-  it('gives every id a distinct color when the count is within the palette size', () => {
-    const ids = Array.from({ length: 17 }, (_, i) => i + 1)
-    const colors = assignCategoryColors(ids)
-    const uniqueColors = new Set(colors.values())
-    expect(uniqueColors.size).toBe(ids.length)
+describe('colorForIndex', () => {
+  it('gives every index within the palette size a distinct color', () => {
+    const colors = Array.from({ length: 17 }, (_, i) => colorForIndex(i))
+    expect(new Set(colors).size).toBe(17)
   })
 
-  it('is stable regardless of input order', () => {
-    const ascending = assignCategoryColors([1, 2, 3, 4])
-    const shuffled = assignCategoryColors([4, 1, 3, 2])
-    expect([...shuffled.entries()]).toEqual([...ascending.entries()])
+  it('wraps around without erroring once the index exceeds the palette size', () => {
+    expect(() => colorForIndex(40)).not.toThrow()
+    expect(colorForIndex(40)).toBe(colorForIndex(40 % 17))
   })
 
-  it('wraps around without erroring once ids exceed the palette size', () => {
-    const ids = Array.from({ length: 40 }, (_, i) => i + 1)
-    expect(() => assignCategoryColors(ids)).not.toThrow()
-    expect(assignCategoryColors(ids).size).toBe(ids.length)
+  it('is a pure function of the index, unaffected by unrelated categories', () => {
+    expect(colorForIndex(3)).toBe(colorForIndex(3))
   })
 
-  it('never assigns adjacent ids the same hue family', () => {
-    const ids = Array.from({ length: 17 }, (_, i) => i + 1)
-    const colors = [...assignCategoryColors(ids).values()]
+  it('never assigns adjacent indices the same hue family', () => {
+    const colors = Array.from({ length: 17 }, (_, i) => colorForIndex(i))
     const hueFamily = (cls: string) => cls.match(/bg-(\w+)-100/)?.[1]
     for (let i = 1; i < colors.length; i++) {
       expect(hueFamily(colors[i]!)).not.toBe(hueFamily(colors[i - 1]!))

@@ -48,9 +48,10 @@ export function ExpenseEntryForm() {
     amountRef.current?.focus()
   }, [])
 
+  const activeCategories = useMemo(() => categories.filter((c) => !c.isArchived), [categories])
   const rankedCategories = useMemo(
-    () => rankCategoriesByCount(categories, transactions),
-    [categories, transactions],
+    () => rankCategoriesByCount(activeCategories, transactions),
+    [activeCategories, transactions],
   )
 
   async function handleSave(categoryOverride?: number) {

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Transaction } from '../../db/schema'
 import { computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
-import { assignCategoryColors } from '../../lib/categoryColor'
 import { rankCategoriesByCount } from '../../lib/categoryRanking'
 import { formatCents } from '../../lib/money'
 import {
@@ -54,13 +53,10 @@ export function MonthView() {
   >(null)
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-  const categoryColors = useMemo(
-    () => assignCategoryColors(categories.map((c) => c.id)),
-    [categories],
-  )
+  const activeCategories = useMemo(() => categories.filter((c) => !c.isArchived), [categories])
   const rankedCategories = useMemo(
-    () => rankCategoriesByCount(categories, transactions),
-    [categories, transactions],
+    () => rankCategoriesByCount(activeCategories, transactions),
+    [activeCategories, transactions],
   )
 
   const monthTransactions = useMemo(
@@ -270,7 +266,7 @@ export function MonthView() {
                   <button
                     type="button"
                     onClick={() => setEditingTx(tx)}
-                    className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:opacity-80 ${categoryColors.get(tx.categoryId) ?? ''}`}
+                    className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:opacity-80 ${categoryById.get(tx.categoryId)?.color ?? ''}`}
                   >
                     <span>
                       {categoryById.get(tx.categoryId)?.name ?? 'Unknown'}
@@ -354,7 +350,7 @@ export function MonthView() {
                   return (
                     <li
                       key={row.categoryId}
-                      className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryColors.get(row.categoryId) ?? ''}`}
+                      className={`flex items-center justify-between rounded px-2 py-1 text-sm ${categoryById.get(row.categoryId)?.color ?? ''}`}
                     >
                       <span>
                         {row.name}

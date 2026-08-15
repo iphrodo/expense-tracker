@@ -4,6 +4,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { supabase } from '../lib/supabase'
 import {
+  archiveCategory,
   createTransactions,
   deleteTransaction,
   getAllData,
@@ -160,6 +161,46 @@ describe('full backup export/import round-trip', () => {
     expect(after.monthFlags.map((m) => ({ month: m.month, isComplete: m.isComplete }))).toEqual(
       before.monthFlags.map((m) => ({ month: m.month, isComplete: m.isComplete })),
     )
+  })
+})
+
+describe('category archiving and color stability', () => {
+  it('assigns a color to a newly created category', async () => {
+    const id = await getOrCreateCategory('Food', false)
+    const category = (await getAllData()).categories.find((c) => c.id === id)
+    expect(category?.color).toBeTruthy()
+  })
+
+  it('archives a category so it stops appearing among non-archived categories', async () => {
+    const id = await getOrCreateCategory('Food', false)
+    await archiveCategory(id)
+
+    const categories = (await getAllData()).categories
+    expect(categories.find((c) => c.id === id)?.isArchived).toBe(true)
+  })
+
+  it("leaves an unaffected category's stored color unchanged when another category is archived", async () => {
+    const foodId = await getOrCreateCategory('Food', false)
+    await getOrCreateCategory('Taxi', false)
+    const before = (await getAllData()).categories.find((c) => c.id === foodId)?.color
+
+    await archiveCategory(foodId)
+    const taxi = (await getAllData()).categories.find((c) => c.name === 'Taxi')
+    expect(taxi?.color).toBeTruthy()
+
+    const foodAfter = (await getAllData()).categories.find((c) => c.id === foodId)?.color
+    expect(foodAfter).toBe(before)
+  })
+
+  it('creates a fresh category when re-using the name of an archived one', async () => {
+    const originalId = await getOrCreateCategory('Food', false)
+    await archiveCategory(originalId)
+
+    const newId = await getOrCreateCategory('Food', false)
+    expect(newId).not.toBe(originalId)
+
+    const categories = (await getAllData()).categories
+    expect(categories.filter((c) => c.name === 'Food')).toHaveLength(2)
   })
 })
 

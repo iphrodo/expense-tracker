@@ -4,13 +4,15 @@ import { AuthGate } from './features/auth/AuthGate'
 import { MonthView } from './features/analytics/MonthView'
 import { AveragesView } from './features/analytics/AveragesView'
 import { ImportExportScreen } from './features/import/ImportExportScreen'
+import { CategoriesScreen } from './features/categories/CategoriesScreen'
 import { supabase } from './lib/supabase'
 
-type Screen = 'month' | 'averages' | 'import'
+type Screen = 'month' | 'averages' | 'categories' | 'import'
 
 const NAV_ITEMS: { id: Screen; label: string }[] = [
   { id: 'month', label: 'Month' },
   { id: 'averages', label: 'Averages' },
+  { id: 'categories', label: 'Categories' },
   { id: 'import', label: 'Import / Export' },
 ]
 
@@ -25,6 +27,8 @@ function App() {
             <MonthView />
           ) : screen === 'averages' ? (
             <AveragesView />
+          ) : screen === 'categories' ? (
+            <CategoriesScreen />
           ) : (
             <ImportExportScreen />
           )}

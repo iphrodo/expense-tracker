@@ -9,6 +9,7 @@ import {
   useTransactions,
 } from '../../db/repository'
 import { useToast } from '../../app/ToastProvider'
+import { FALLBACK_CATEGORY_COLOR } from '../../lib/categoryColor'
 
 export function AveragesView() {
   const categories = useCategories()
@@ -62,15 +63,24 @@ export function AveragesView() {
             </tr>
           </thead>
           <tbody>
-            {averageRows.map((row) => (
-              <tr key={row.categoryId} className="border-t border-neutral-100 dark:border-neutral-800">
-                <td className="py-1">{categoryById.get(row.categoryId)?.name ?? 'Unknown'}</td>
-                <td className="py-1 font-mono">
-                  {row.average === null ? '—' : `${formatCents(row.average)} €`}
-                </td>
-                <td className="py-1">{row.monthsCounted}</td>
-              </tr>
-            ))}
+            {averageRows.map((row) => {
+              const category = categoryById.get(row.categoryId)
+              return (
+                <tr key={row.categoryId} className="border-t border-neutral-100 dark:border-neutral-800">
+                  <td className="py-1">
+                    <span
+                      className={`rounded-full px-2 py-0.5 ${category?.color ?? FALLBACK_CATEGORY_COLOR}`}
+                    >
+                      {category?.name ?? 'Unknown'}
+                    </span>
+                  </td>
+                  <td className="py-1 font-mono">
+                    {row.average === null ? '—' : `${formatCents(row.average)} €`}
+                  </td>
+                  <td className="py-1">{row.monthsCounted}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -82,7 +92,12 @@ export function AveragesView() {
           {exclusions.map((ex) => (
             <li key={ex.id} className="flex items-center justify-between py-1 text-sm">
               <span>
-                {categoryById.get(ex.categoryId)?.name ?? 'Unknown'} — {ex.month}
+                <span
+                  className={`rounded-full px-2 py-0.5 ${categoryById.get(ex.categoryId)?.color ?? FALLBACK_CATEGORY_COLOR}`}
+                >
+                  {categoryById.get(ex.categoryId)?.name ?? 'Unknown'}
+                </span>{' '}
+                — {ex.month}
                 {ex.reason && <span className="ml-2 text-neutral-400">({ex.reason})</span>}
               </span>
               <button
