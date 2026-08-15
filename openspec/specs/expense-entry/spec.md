@@ -28,10 +28,10 @@ There SHALL NOT be a separate, independently-navigable Entry screen or bottom-na
 ### Requirement: Amount field is focused on mount and after every save
 The amount input, embedded at the top of the Month view, SHALL receive focus automatically when
 the Month view mounts, and SHALL receive focus again immediately after each successful save, so
-the user never reaches for the mouse or trackpad to begin the next entry. On devices that present
-a numeric keyboard, mounting or refocusing the amount field SHALL present it. Switching the
-selected month (e.g. via the month/year pickers) SHALL NOT itself move focus into or out of the
-amount field.
+the user never reaches for the mouse or trackpad to begin the next entry. The field SHALL use a
+standard text keyboard on mobile, not a numeric-only one, so the arithmetic operators (`+ - * /
+( )`) remain typeable. Switching the selected month (e.g. via the month/year pickers) SHALL NOT
+itself move focus into or out of the amount field.
 
 #### Scenario: No interaction needed to start typing on mount
 - **WHEN** the Month view finishes mounting
@@ -43,8 +43,10 @@ amount field.
   further action
 
 ### Requirement: Amount field accepts arithmetic expressions with explicit splitting rules
-The amount field SHALL accept an arithmetic expression using digits, decimal points, and the
-operators `+ - * / ( )`. Splitting into transactions follows these rules:
+The amount field SHALL accept an arithmetic expression using digits, a decimal separator, and the
+operators `+ - * / ( )`. Both `.` and `,` SHALL be accepted as the decimal separator; any `,` in
+the input SHALL be normalized to `.` before validation and evaluation, so `12,50` and `12.50` are
+equivalent. Splitting into transactions follows these rules:
 
 - **Top-level `+` and `-` split the expression into separate transactions**, one per top-level
   term, each carrying its own sign. `17.03-10.50` SHALL create two transactions: one of amount
@@ -56,7 +58,7 @@ operators `+ - * / ( )`. Splitting into transactions follows these rules:
 - The final amount of every resulting transaction MAY be negative. It SHALL NOT be zero: an
   expression, or any individual top-level term within it, that evaluates to exactly 0 SHALL be
   rejected inline as a whole (no partial save of the non-zero terms).
-- Input containing any character outside `0-9 . + - * / ( )` SHALL be rejected with inline
+- Input containing any character outside `0-9 . , + - * / ( )` SHALL be rejected with inline
   validation; the system SHALL NOT show a modal dialog for a rejected expression.
 
 #### Scenario: Batch entry splits addends into separate transactions
@@ -67,6 +69,11 @@ operators `+ - * / ( )`. Splitting into transactions follows these rules:
 #### Scenario: Single amount creates one transaction
 - **WHEN** the user types `12.50` and selects a category, then saves
 - **THEN** the system creates exactly 1 transaction of amount 1250 cents
+
+#### Scenario: Comma decimal separator is accepted
+- **WHEN** the user types `12,50` and selects a category, then saves
+- **THEN** the system creates exactly 1 transaction of amount 1250 cents, identical to typing
+  `12.50`
 
 #### Scenario: Top-level minus creates a negative transaction
 - **WHEN** the user types `17.03-10.50` and selects a category, then saves
