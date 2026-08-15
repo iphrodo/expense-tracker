@@ -119,20 +119,20 @@
       use the app's "Export data (backup)" action (built in section 1) to produce a fresh export
       file. This is the migration input — do not substitute the old seed CSV or an export taken
       before section 1 shipped.
-- [ ] 10.2 Run the load script against that export file and confirm it reports success (all figures
+- [x] 10.2 Run the load script against that export file and confirm it reports success (all figures
       matched, transaction committed).
-- [ ] 10.3 **Manual, blocking**: compare the figures the load script printed (row count, category
+- [x] 10.3 **Manual, blocking**: compare the figures the load script printed (row count, category
       count, grand total, per-month totals) against what the app currently displays for the same
       data, and confirm they match before proceeding.
-- [ ] 10.4 Point the deployed app at the now-populated Postgres project (if not already, per task
+- [x] 10.4 Point the deployed app at the now-populated Postgres project (if not already, per task
       8.2) and confirm both people can see the migrated data from their own machines.
 
 ## 11. Cleanup (only after migration is verified — last steps)
 
-- [ ] 11.1 Remove the seed-import button/handler and its `/seed/transactions.csv` fetch from
+- [x] 11.1 Remove the seed-import button/handler and its `/seed/transactions.csv` fetch from
       `src/features/import/ImportExportScreen.tsx`, per the removed `data-import` requirement.
-- [ ] 11.2 Delete `public/seed/transactions.csv`.
-- [ ] 11.3 Delete the load script built in section 9, now that the migration is complete. The
+- [x] 11.2 Delete `public/seed/transactions.csv`.
+- [x] 11.3 Delete the load script built in section 9, now that the migration is complete. The
       `data-backup` export/import built in section 1 is a permanent feature and is NOT deleted.
-- [ ] 11.4 Run `openspec validate --strict` and the full test suite one more time before closing out
+- [x] 11.4 Run `openspec validate --strict` and the full test suite one more time before closing out
       the change.

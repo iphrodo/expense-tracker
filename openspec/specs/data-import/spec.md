@@ -7,36 +7,6 @@ and keeps an escape hatch back out to CSV so the user is never locked into this 
 
 ## Requirements
 
-### Requirement: One-time CSV seed import
-The system SHALL support importing transactions from a CSV file at `/seed/transactions.csv` with
-columns `row_index, date, category, amount_eur, note, is_daily, source_sheet`. The system SHALL
-create a `Category` record for each distinct `category` value encountered, setting that
-category's `isDaily` flag from the `is_daily` column. The `source_sheet` column SHALL be read but
-not stored or otherwise used, since it is migration provenance only. `row_index` SHALL be a
-unique, stable integer per row in the source file — assigned once when the CSV is generated from
-the spreadsheet — and SHALL NOT be derived from `date`, `category`, `amount_eur`, or `note`, since
-those columns are not unique per row (a single spreadsheet cell batching several purchases, e.g.
-`=5.96+4.22+4.96`, expands into multiple rows that legitimately share date, category, and amount).
-
-#### Scenario: Import creates categories and transactions from CSV rows
-- **WHEN** `/seed/transactions.csv` contains rows for 29 distinct category values across 1763
-  data rows
-- **THEN** the import creates 29 `Category` records (one per distinct value, `isDaily` set per
-  row) and 1763 `Transaction` records, one per data row, with `amountEur` stored as integer cents
-  converted from `amount_eur`
-
-#### Scenario: Negative amount_eur values are imported as valid transactions
-- **WHEN** a row in `/seed/transactions.csv` has a negative `amount_eur` value, such as a refund
-  recorded against its original category (e.g. `-50.78`)
-- **THEN** the import creates a `Transaction` with a negative `amountEur` in integer cents; a
-  negative value is not treated as malformed and is not rejected or skipped
-
-#### Scenario: Rows sharing date, category, and amount are all imported
-- **WHEN** `/seed/transactions.csv` contains 3 rows with distinct `row_index` values that share
-  the same `date`, `category`, and `amount_eur` (a batched-cell expansion)
-- **THEN** the import creates 3 separate `Transaction` records, none of them dropped as a
-  duplicate
-
 ### Requirement: Import upserts rows using row_index as the identity key
 Running the import against a CSV file SHALL NOT create duplicate `Category` or `Transaction`
 records for a `row_index` already present. The system SHALL use each row's `row_index` — not any
@@ -123,11 +93,10 @@ offending row rather than silently skipping it.
   required for it to serve as the identity key
 
 ### Requirement: Import from a user-picked file
-The system SHALL allow the user to pick an arbitrary CSV file from their local disk, in the same
-column shape as the seed import (`row_index, date, category, amount_eur, note, is_daily,
-source_sheet`), and import it via the upsert behavior above, in addition to the existing one-click
-import of the fixed `/seed/transactions.csv` file. A file picked this way is imported without a
-caller-supplied expected row count or amount sum.
+The system SHALL allow the user to pick an arbitrary CSV file from their local disk, with columns
+`row_index, date, category, amount_eur, note, is_daily, source_sheet`, and import it via the
+upsert behavior above. A file picked this way is imported without a caller-supplied expected row
+count or amount sum.
 
 #### Scenario: User imports a corrected file to fix bad data
 - **WHEN** the user has previously imported transactions and later notices incorrect amounts for a
@@ -138,8 +107,8 @@ caller-supplied expected row count or amount sum.
 
 #### Scenario: Picked file with malformed rows fails loudly
 - **WHEN** the user picks a CSV file from disk that contains a malformed row
-- **THEN** the import fails with an error identifying the offending row, consistent with seed
-  import behavior, and no partial import is committed for that file
+- **THEN** the import fails with an error identifying the offending row, and no partial import is
+  committed for that file
 
 ### Requirement: CSV export of all transactions
 The system SHALL support exporting all transactions currently stored, in the same column shape as

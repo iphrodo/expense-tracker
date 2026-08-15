@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { importSeedCsv, SEED_IMPORT_EXPECTATIONS } from './importer'
+import { importSeedCsv } from './importer'
 import { exportTransactionsToCsv } from '../../lib/csv'
 import { buildBackup, parseBackup, serializeBackup, BackupParseError } from '../../lib/backup'
 import { getAllData, replaceAllData, useCategories, useTransactions } from '../../db/repository'
@@ -36,24 +36,6 @@ export function ImportExportScreen() {
   const [backupImporting, setBackupImporting] = useState(false)
   const categories = useCategories()
   const transactions = useTransactions()
-
-  async function handleImport() {
-    setImporting(true)
-    setStatus(null)
-    try {
-      const response = await fetch('/seed/transactions.csv')
-      if (!response.ok) {
-        throw new Error(`Could not load /seed/transactions.csv (${response.status})`)
-      }
-      const text = await response.text()
-      const report = await importSeedCsv(text, SEED_IMPORT_EXPECTATIONS)
-      setStatus(formatImportStatus(report))
-    } catch (err) {
-      setStatus(err instanceof Error ? `Import failed: ${err.message}` : 'Import failed')
-    } finally {
-      setImporting(false)
-    }
-  }
 
   async function handleFilePicked(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -174,27 +156,6 @@ export function ImportExportScreen() {
       </div>
 
       <div>
-        <h2 className="mb-2 text-lg font-semibold">One-time seed import</h2>
-        <p className="mb-2 text-sm text-neutral-500">
-          Imports <code>/seed/transactions.csv</code>. Safe to run more than once — already
-          imported rows are skipped.
-        </p>
-        <button
-          type="button"
-          disabled={importing}
-          onClick={() => void handleImport()}
-          className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {importing ? 'Importing…' : 'Import seed data'}
-        </button>
-        {status && (
-          <p className="mt-2 text-sm" data-testid="import-status">
-            {status}
-          </p>
-        )}
-      </div>
-
-      <div>
         <h2 className="mb-2 text-lg font-semibold">Re-import a corrected file</h2>
         <p className="mb-2 text-sm text-neutral-500">
           Pick a CSV file from disk in the same format as export. Rows whose{' '}
@@ -209,6 +170,11 @@ export function ImportExportScreen() {
           data-testid="import-file-input"
           className="text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-200 file:px-3 file:py-1.5 file:font-semibold file:text-neutral-900 dark:file:bg-neutral-700 dark:file:text-neutral-100"
         />
+        {status && (
+          <p className="mt-2 text-sm" data-testid="import-status">
+            {status}
+          </p>
+        )}
       </div>
 
       <div>
