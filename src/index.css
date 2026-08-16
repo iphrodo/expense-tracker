@@ -110,13 +110,17 @@ body {
   }
 }
 
-/* Focus styling: single accent-colored ring everywhere, replacing the browser default. */
-:focus {
-  outline: none;
-}
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+/* Focus styling: single accent-colored ring everywhere, replacing the browser default.
+   Scoped to @layer base so per-element utilities like `focus-visible:outline-none` (in
+   Tailwind's utilities layer) can still override it. */
+@layer base {
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
