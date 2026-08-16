@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Transaction } from '../../db/schema'
-import { computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
+import { computeHistoricalTotals, computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
 import { rankCategoriesByCount } from '../../lib/categoryRanking'
 import { formatCents } from '../../lib/money'
 import { getCategoryColorRoles } from '../../lib/categoryColor'
@@ -248,9 +248,21 @@ export function MonthView() {
     [transactions, categories, month],
   )
 
+  const historicalTotals = useMemo(
+    () => computeHistoricalTotals(transactions, categories, monthFlags, new Date()),
+    [transactions, categories, monthFlags],
+  )
+
   const monthSummary = useMemo(
-    () => computeMonthSummary(transactions, categories, month, new Date()),
-    [transactions, categories, month],
+    () =>
+      computeMonthSummary(
+        transactions,
+        categories,
+        month,
+        new Date(),
+        historicalTotals.nonDailyMonthlyAverageCents,
+      ),
+    [transactions, categories, month, historicalTotals],
   )
 
   const exclusionKeys = useMemo(
@@ -428,15 +440,13 @@ export function MonthView() {
               <span className="t-num ml-auto text-text">{formatCents(monthSummary.nonDailyCents)}</span>
             </div>
           </div>
-          <div className="mt-s4 flex gap-s3 border-t border-border pt-s3">
-            <div className="flex-1">
-              <div className="t-num-lg text-text">{formatCents(monthSummary.dailyRateCents)}</div>
-              <div className="t-micro mt-0.5 text-text-3">Щоденні витрати на 1 день</div>
-            </div>
-            <div className="flex-1">
-              <div className="t-num-lg text-text">{formatCents(monthSummary.projectedCents)}</div>
-              <div className="t-micro mt-0.5 text-text-3">Щоденні витрати (місяць)</div>
-            </div>
+          <div className="mt-s4 flex items-baseline justify-between border-t border-border pt-s3">
+            <span className="t-meta text-text-2">Щоденні витрати на 1 день</span>
+            <span className="t-num text-text">{formatCents(monthSummary.dailyRateCents)}</span>
+          </div>
+          <div className="mt-s3 flex items-baseline justify-between border-t border-border pt-s3">
+            <span className="t-meta text-text-2">Прогноз до кінця місяця (всього)</span>
+            <span className="t-num-lg text-text">{formatCents(monthSummary.totalProjectedCents)}</span>
           </div>
         </div>
 

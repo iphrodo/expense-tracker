@@ -74,31 +74,47 @@ export function computeAverages(
   return rows
 }
 
-export interface DailyRunRate {
+export interface HistoricalTotals {
   totalCents: number
-  daysElapsed: number
-  dailyRateCents: number
-  daysInMonth: number
-  projectedCents: number
+  monthsCount: number
+  firstMonth: string | null
+  lastMonth: string | null
+  dailyAverageCents: number
+  monthlyAverageCents: number
+  nonDailyMonthlyAverageCents: number
 }
 
-export function computeDailyRunRate(
+export function computeHistoricalTotals(
   transactions: Transaction[],
   categories: Category[],
+  monthFlags: MonthFlag[],
   now: Date,
-): DailyRunRate {
+): HistoricalTotals {
   const dailyCategoryIds = new Set(categories.filter((c) => c.isDaily).map((c) => c.id))
-  const month = currentMonth(now)
-  const totalCents = transactions
-    .filter((tx) => monthOf(tx.date) === month && dailyCategoryIds.has(tx.categoryId))
+
+  const completeMonths = new Set(
+    transactions.map((tx) => monthOf(tx.date)).filter((month) => isMonthComplete(month, now, monthFlags)),
+  )
+
+  const eligible = transactions.filter((tx) => completeMonths.has(monthOf(tx.date)))
+  const totalCents = eligible.reduce((sum, tx) => sum + tx.amountCents, 0)
+  const nonDailyCents = eligible
+    .filter((tx) => !dailyCategoryIds.has(tx.categoryId))
     .reduce((sum, tx) => sum + tx.amountCents, 0)
 
-  const daysElapsed = now.getDate()
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const dailyRateCents = daysElapsed === 0 ? 0 : totalCents / daysElapsed
-  const projectedCents = dailyRateCents * daysInMonth
+  const sortedMonths = [...completeMonths].sort()
+  const monthsCount = sortedMonths.length
+  const totalDays = sortedMonths.reduce((sum, month) => sum + daysInMonthOf(month), 0)
 
-  return { totalCents, daysElapsed, dailyRateCents, daysInMonth, projectedCents }
+  return {
+    totalCents,
+    monthsCount,
+    firstMonth: sortedMonths[0] ?? null,
+    lastMonth: sortedMonths[sortedMonths.length - 1] ?? null,
+    dailyAverageCents: totalDays === 0 ? 0 : totalCents / totalDays,
+    monthlyAverageCents: monthsCount === 0 ? 0 : totalCents / monthsCount,
+    nonDailyMonthlyAverageCents: monthsCount === 0 ? 0 : nonDailyCents / monthsCount,
+  }
 }
 
 function daysInMonthOf(month: string): number {
@@ -150,14 +166,22 @@ export interface MonthSummary {
   nonDailyCents: number
   dailyCents: number
   dailyRateCents: number
-  projectedCents: number
+  totalProjectedCents: number
 }
 
+/**
+ * Projects the month's total spend as: money already spent, plus the current
+ * daily-category pace carried through the remaining days, plus whichever is
+ * bigger of this month's non-daily spend so far or the typical monthly
+ * non-daily spend (one-off bills that haven't landed yet still get budgeted
+ * for). For a month that has already ended, this collapses to the actual total.
+ */
 export function computeMonthSummary(
   transactions: Transaction[],
   categories: Category[],
   month: string,
   now: Date,
+  typicalNonDailyMonthlyCents = 0,
 ): MonthSummary {
   const dailyCategoryIds = new Set(categories.filter((c) => c.isDaily).map((c) => c.id))
   const monthTransactions = transactions.filter((tx) => monthOf(tx.date) === month)
@@ -170,7 +194,12 @@ export function computeMonthSummary(
 
   const daysElapsed = daysElapsedIn(month, now)
   const dailyRateCents = daysElapsed === 0 ? 0 : dailyCents / daysElapsed
-  const projectedCents = dailyRateCents * daysInMonthOf(month)
+  const daysRemaining = daysInMonthOf(month) - daysElapsed
 
-  return { totalCents, nonDailyCents, dailyCents, dailyRateCents, projectedCents }
+  const totalProjectedCents =
+    daysRemaining <= 0
+      ? totalCents
+      : dailyCents + dailyRateCents * daysRemaining + Math.max(nonDailyCents, typicalNonDailyMonthlyCents)
+
+  return { totalCents, nonDailyCents, dailyCents, dailyRateCents, totalProjectedCents }
 }
