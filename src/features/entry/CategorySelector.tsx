@@ -115,8 +115,10 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
     function openPanel() {
       setOpen(true)
       setQuery('')
-      setHighlightIndex(0)
-      requestAnimationFrame(() => inputRef.current?.focus())
+      setHighlightIndex(-1)
+      if (window.matchMedia('(pointer: fine)').matches) {
+        requestAnimationFrame(() => inputRef.current?.focus())
+      }
     }
     function closePanel() {
       setOpen(false)
@@ -179,12 +181,12 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
-                  setHighlightIndex(0)
+                  setHighlightIndex(-1)
                 }}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search categories"
                 aria-label="Search categories"
-                className="h-11 w-full rounded-sm border border-border px-s2 text-sm text-text"
+                className="h-11 w-full rounded-sm border border-border px-s2 text-sm text-text outline-none focus:outline-none"
               />
               <ul className="mt-s2 max-h-64 divide-y divide-border overflow-auto text-sm">
                 {matches.map((c, i) => {

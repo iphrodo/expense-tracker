@@ -88,23 +88,6 @@ export function ExpenseEntryForm() {
     return formatCents(parsed.centsPerTerm.reduce((sum, cents) => sum + cents, 0))
   }, [amount])
 
-  function openDatePicker() {
-    setShowDatePicker(true)
-    requestAnimationFrame(() => {
-      const input = dateInputRef.current
-      if (!input) return
-      if ('showPicker' in input) {
-        try {
-          ;(input as HTMLInputElement & { showPicker: () => void }).showPicker()
-          return
-        } catch {
-          // fall through to focus
-        }
-      }
-      input.focus()
-    })
-  }
-
   async function handleSave(categoryOverride?: number) {
     const categoryId = categoryOverride ?? selectedCategoryId
     const parsed = parseAmountExpression(amount)
@@ -168,7 +151,7 @@ export function ExpenseEntryForm() {
         className="grid min-w-0 grid-cols-[1fr_84px] items-center gap-[10px] [grid-template-areas:'amount_save'_'chips_chips'_'meta_meta'] min-[900px]:grid-cols-[260px_auto_auto_1fr_120px] min-[900px]:[grid-template-areas:'amount_date_note_._save'_'chips_chips_chips_chips_all']"
       >
         <div className="min-w-0 [grid-area:amount]">
-          <div className="flex h-12 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 transition-colors duration-[120ms] ease-out focus-within:border-accent">
+          <div className="flex h-12 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3">
             <span aria-hidden className="text-[18px] text-text-3">
               €
             </span>
@@ -194,7 +177,7 @@ export function ExpenseEntryForm() {
               placeholder="0.00"
               aria-label="Amount"
               autoFocus
-              className="tabular-amount min-w-0 flex-1 border-none bg-transparent text-[24px] font-[650] tracking-[-0.02em] text-text outline-none placeholder:text-text-3"
+              className="tabular-amount min-w-0 flex-1 border-none bg-transparent text-[24px] font-[650] tracking-[-0.02em] text-text outline-none focus-visible:outline-none placeholder:text-text-3"
             />
             {preview && (
               <span className="tabular-amount ml-auto shrink-0 text-[12px] font-medium text-text-2">
@@ -244,25 +227,28 @@ export function ExpenseEntryForm() {
                 <span className="min-[900px]:hidden">Yest.</span>
                 <span className="hidden min-[900px]:inline">Yesterday</span>
               </button>
-              <button type="button" onClick={openDatePicker} className={segmentClass(isPickActive)}>
+              <span className={`relative ${segmentClass(isPickActive)}`}>
                 {formatShortDate(date)}
-              </button>
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  onFocus={() => setShowDatePicker(true)}
+                  aria-label="Pick date"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </span>
             </div>
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              tabIndex={-1}
-              aria-hidden
-              className="absolute h-px w-px overflow-hidden opacity-0"
-              style={{ clip: 'rect(0,0,0,0)' }}
-            />
           </div>
 
           <button
             type="button"
             onClick={() => {
+              if (noteOpen) {
+                setNoteOpen(false)
+                return
+              }
               setNoteOpen(true)
               requestAnimationFrame(() => noteInputRef.current?.focus())
             }}
@@ -297,7 +283,7 @@ export function ExpenseEntryForm() {
           onChange={(e) => setNote(e.target.value)}
           placeholder="Note (optional)"
           aria-label="Note"
-          className="t-body h-11 w-full rounded-sm border-none bg-transparent px-0 text-text outline-none focus:border-b focus:border-accent placeholder:text-text-3"
+          className="t-body h-11 w-full rounded-none border-x-0 border-t-0 border-b border-accent bg-transparent px-0 text-text outline-none focus-visible:outline-none placeholder:text-text-3"
         />
       )}
     </div>
