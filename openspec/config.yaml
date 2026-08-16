@@ -1,32 +1,24 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: Vite + React 19 + TypeScript + Tailwind + Vitest + PWA
+  Backend: Supabase Postgres (hosted on Vercel)
+  Testing: use existing Vitest unit/integration tests for verification.
+  Do NOT write standalone browser-automation driver scripts (Playwright/Puppeteer)
+  for manual verification unless the user explicitly asks for E2E testing.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  tasks:
+    - Do not add tasks for writing Playwright/Puppeteer driver scripts or other
+      manual browser-automation verification steps unless explicitly requested.
+    - Verification steps should reference existing Vitest tests, type-checking,
+      or build success — not new ad-hoc scripts.
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Do not create Playwright/Puppeteer driver scripts (e.g. drive.mjs) to
+        verify functionality. Use existing Vitest tests, `tsc --noEmit`, or a
+        successful build as verification instead.
+      - If E2E browser verification is genuinely needed, ask the user for
+        confirmation before writing a driver script.

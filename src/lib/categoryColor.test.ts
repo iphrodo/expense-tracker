@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { colorForIndex, getCategoryColorRoles } from './categoryColor'
+import { colorForIndex, getCategoryColorRoles, unusedColorFor } from './categoryColor'
 
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16)
@@ -43,6 +43,28 @@ describe('colorForIndex', () => {
     for (let i = 1; i < colors.length; i++) {
       expect(hueFamily(colors[i]!)).not.toBe(hueFamily(colors[i - 1]!))
     }
+  })
+})
+
+describe('unusedColorFor', () => {
+  it('picks a color unused among the given active colors', () => {
+    const active = [colorForIndex(0), colorForIndex(1)]
+    const picked = unusedColorFor(active, active.length)
+    expect(active).not.toContain(picked)
+  })
+
+  it('picks the first palette entry when no colors are in use', () => {
+    expect(unusedColorFor([], 0)).toBe(colorForIndex(0))
+  })
+
+  it('falls back to round-robin-by-count once every palette color is in use', () => {
+    const allColors = Array.from({ length: 17 }, (_, i) => colorForIndex(i))
+    expect(unusedColorFor(allColors, 17)).toBe(colorForIndex(17))
+    expect(unusedColorFor(allColors, 20)).toBe(colorForIndex(20))
+  })
+
+  it('ignores undefined entries in the active-colors list', () => {
+    expect(unusedColorFor([undefined, undefined], 0)).toBe(colorForIndex(0))
   })
 })
 

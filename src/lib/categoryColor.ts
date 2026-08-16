@@ -33,6 +33,17 @@ export function colorForIndex(index: number): string {
   return PALETTE[index % PALETTE.length]!
 }
 
+/**
+ * Picks the first palette color not currently used by any category in `activeColors`, so a newly
+ * created category's color is visually distinct from every other active category. Falls back to
+ * `colorForIndex(count)` round-robin once every palette entry is already in use.
+ */
+export function unusedColorFor(activeColors: (string | undefined)[], count: number): string {
+  const used = new Set(activeColors.filter((c): c is string => c !== undefined))
+  const firstUnused = PALETTE.find((color) => !used.has(color))
+  return firstUnused ?? colorForIndex(count)
+}
+
 /** Fallback for categories that predate stored colors or lack one for any other reason. */
 export const FALLBACK_CATEGORY_COLOR =
   'border border-neutral-300 text-neutral-700 dark:border-neutral-700 dark:text-neutral-300'
