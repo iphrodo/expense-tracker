@@ -5,6 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { supabase } from '../lib/supabase'
 import {
   archiveCategory,
+  createCategory,
   createTransactions,
   deleteTransaction,
   getAllData,
@@ -12,6 +13,7 @@ import {
   getOrCreateCategory,
   replaceAllData,
   restoreTransaction,
+  updateCategory,
   updateTransaction,
 } from './repository'
 import { buildBackup, parseBackup, serializeBackup } from '../lib/backup'
@@ -201,6 +203,71 @@ describe('category archiving and color stability', () => {
 
     const categories = (await getAllData()).categories
     expect(categories.filter((c) => c.name === 'Food')).toHaveLength(2)
+  })
+})
+
+describe('createCategory', () => {
+  it('assigns a color distinct from every other active category', async () => {
+    const foodId = await createCategory('Food', false)
+    const taxiId = await createCategory('Taxi', false)
+
+    const categories = (await getAllData()).categories
+    const food = categories.find((c) => c.id === foodId)
+    const taxi = categories.find((c) => c.id === taxiId)
+    expect(food?.color).toBeTruthy()
+    expect(taxi?.color).toBeTruthy()
+    expect(food?.color).not.toBe(taxi?.color)
+  })
+
+  it('rejects a duplicate name (case-insensitive) and leaves the existing category unchanged', async () => {
+    await createCategory('Food', false)
+
+    await expect(createCategory('food', true)).rejects.toThrow()
+
+    const categories = (await getAllData()).categories
+    expect(categories.filter((c) => c.name.toLowerCase() === 'food')).toHaveLength(1)
+    expect(categories.find((c) => c.name === 'Food')?.isDaily).toBe(false)
+  })
+})
+
+describe('updateCategory', () => {
+  it('renames a category, keeping its id and color unchanged', async () => {
+    const id = await createCategory('Food', false)
+    const before = (await getAllData()).categories.find((c) => c.id === id)
+
+    await updateCategory(id, { name: 'Groceries' })
+
+    const after = (await getAllData()).categories.find((c) => c.id === id)
+    expect(after?.id).toBe(id)
+    expect(after?.name).toBe('Groceries')
+    expect(after?.color).toBe(before?.color)
+  })
+
+  it('retypes a category from non-daily to daily', async () => {
+    const id = await createCategory('Food', false)
+    await updateCategory(id, { isDaily: true })
+
+    const after = (await getAllData()).categories.find((c) => c.id === id)
+    expect(after?.isDaily).toBe(true)
+  })
+
+  it('rejects renaming to a duplicate name (case-insensitive) and leaves the stored name unchanged', async () => {
+    await createCategory('Food', false)
+    const taxiId = await createCategory('Taxi', false)
+
+    await expect(updateCategory(taxiId, { name: 'food' })).rejects.toThrow()
+
+    const taxi = (await getAllData()).categories.find((c) => c.id === taxiId)
+    expect(taxi?.name).toBe('Taxi')
+  })
+
+  it('allows updating a category to keep its own current name', async () => {
+    const id = await createCategory('Food', false)
+    await expect(updateCategory(id, { name: 'Food', isDaily: true })).resolves.not.toThrow()
+
+    const after = (await getAllData()).categories.find((c) => c.id === id)
+    expect(after?.name).toBe('Food')
+    expect(after?.isDaily).toBe(true)
   })
 })
 

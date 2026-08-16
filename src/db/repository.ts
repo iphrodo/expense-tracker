@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { supabase } from '../lib/supabase'
-import { colorForIndex } from '../lib/categoryColor'
+import { colorForIndex, unusedColorFor } from '../lib/categoryColor'
 import type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
 
 export type { AverageExclusion, Category, MonthFlag, Transaction } from './schema'
@@ -285,6 +285,67 @@ export async function getOrCreateCategory(name: string, isDaily: boolean): Promi
   if (error) throw error
   await categoriesStore.refresh()
   return (data as { id: number }).id
+}
+
+/** Explicitly creates a category (distinct from `getOrCreateCategory`'s implicit lookup-or-create). */
+export async function createCategory(name: string, isDaily: boolean): Promise<number> {
+  const { data: active, error: selectError } = await supabase
+    .from('categories')
+    .select('id, name, color')
+    .eq('is_archived', false)
+  if (selectError) throw selectError
+  const activeRows = (active ?? []) as { id: number; name: string; color: string }[]
+  if (activeRows.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error('A category with this name already exists')
+  }
+
+  // Round-robin count (including archived), used only as the color helper's fallback once every
+  // palette color is already in use by an active category.
+  const { count, error: countError } = await supabase
+    .from('categories')
+    .select('*', { count: 'exact', head: true })
+  if (countError) throw countError
+
+  const color = unusedColorFor(
+    activeRows.map((c) => c.color),
+    count ?? 0,
+  )
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name, is_daily: isDaily, color })
+    .select('id')
+    .single()
+  if (error) throw error
+  await categoriesStore.refresh()
+  return (data as { id: number }).id
+}
+
+/** Renames and/or retypes a category in place; its id and color are unchanged. */
+export async function updateCategory(
+  id: number,
+  patch: { name?: string; isDaily?: boolean },
+): Promise<void> {
+  if (patch.name !== undefined) {
+    const newName = patch.name
+    const { data: active, error: selectError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('is_archived', false)
+    if (selectError) throw selectError
+    const activeRows = (active ?? []) as { id: number; name: string }[]
+    if (activeRows.some((c) => c.id !== id && c.name.toLowerCase() === newName.toLowerCase())) {
+      throw new Error('A category with this name already exists')
+    }
+  }
+
+  const update: Partial<CategoryRow> = {}
+  if (patch.name !== undefined) update.name = patch.name
+  if (patch.isDaily !== undefined) update.is_daily = patch.isDaily
+
+  const { error } = await supabase.from('categories').update(update).eq('id', id)
+  if (error) throw error
+  await categoriesStore.refresh()
 }
 
 /** Soft-deletes a category: it's archived, keeping its history intact, but never offered again for selection. */
