@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { computeAverages, computeDailyRunRate } from '../../lib/averages'
+import { computeAverages, computeHistoricalTotals } from '../../lib/averages'
 import { formatCents } from '../../lib/money'
 import {
   removeExclusion,
@@ -47,25 +47,32 @@ export function AveragesView() {
     return rows
   }, [averageRows, sortMode, categoryById])
 
-  const runRate = useMemo(
-    () => computeDailyRunRate(transactions, categories, now),
-    [transactions, categories, now],
+  const historicalTotals = useMemo(
+    () => computeHistoricalTotals(transactions, categories, monthFlags, now),
+    [transactions, categories, monthFlags, now],
   )
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-s5 p-s4">
       <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
-        <div className="t-micro text-text-3">DAILY RUN-RATE</div>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="t-display tabular-amount text-text">{formatCents(runRate.dailyRateCents)}</span>
-          <span className="t-body text-text-2">€/day</span>
+        <div className="t-micro text-text-3">СЕРЕДНІ ВИТРАТИ (ЗА ВЕСЬ ЧАС)</div>
+        <div className="mt-s3 flex gap-s3">
+          <div className="flex-1">
+            <div className="t-num-lg text-text">{formatCents(historicalTotals.dailyAverageCents)}</div>
+            <div className="t-micro mt-0.5 text-text-3">€/день (в середньому)</div>
+          </div>
+          <div className="flex-1">
+            <div className="t-num-lg text-text">{formatCents(historicalTotals.monthlyAverageCents)}</div>
+            <div className="t-micro mt-0.5 text-text-3">€/місяць (в середньому)</div>
+          </div>
         </div>
-        <p className="t-meta mt-s2 text-text-2">
-          over {runRate.daysElapsed} day{runRate.daysElapsed === 1 ? '' : 's'} elapsed
-        </p>
         <div className="mt-s4 flex items-baseline justify-between border-t border-border pt-s4">
-          <span className="t-meta text-text-2">Projected full month ({runRate.daysInMonth} days)</span>
-          <span className="t-num-lg text-text">{formatCents(runRate.projectedCents)}</span>
+          <span className="t-meta text-text-2">
+            {historicalTotals.monthsCount === 0
+              ? 'Всього витрачено'
+              : `Всього витрачено (${historicalTotals.firstMonth}–${historicalTotals.lastMonth}, ${historicalTotals.monthsCount} міс.)`}
+          </span>
+          <span className="t-num-lg text-text">{formatCents(historicalTotals.totalCents)}</span>
         </div>
       </div>
 

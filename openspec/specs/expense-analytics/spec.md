@@ -147,27 +147,38 @@ unavailable/dash) rather than crashing or showing `Infinity`/`NaN`.
 - **THEN** the averages view renders without error and shows category A with no numeric average
   (monthsCounted: 0)
 
-### Requirement: Daily run-rate projects current-month spend
-The system SHALL provide a daily run-rate figure computed as the sum of all transactions in
-`isDaily` categories for the current month, divided by the number of days elapsed in the current
-month (including today), and SHALL also display a projection of that run-rate to a full month
-(run-rate × days in the current month).
+### Requirement: Historical averages summarize all-time spend
+The averages view SHALL provide a card summarizing spend across every *complete* month (per the
+"A month counts toward averages only if complete, in either direction" requirement): the average
+spend per calendar day (total spend across complete months divided by the total number of days
+those months span), the average spend per month (total spend divided by the count of complete
+months), and the total amount spent together with the date range and count of complete months it
+covers. This computation SHALL include every transaction in a complete month regardless of any
+active `AverageExclusion` for that category-month — exclusions apply only to the existing
+per-category "Category averages" table, not to this card.
 
-#### Scenario: Run-rate divides by days elapsed, including today
-- **WHEN** today is the 10th of a month and `isDaily` categories total 150 EUR in transactions so
-  far this month
-- **THEN** the displayed daily run-rate is 15.00 EUR/day (150 / 10)
+#### Scenario: Card shows totals unaffected by active exclusions
+- **WHEN** category A has an active `AverageExclusion` for a complete month, and that month's
+  transactions for category A total 300 EUR
+- **THEN** the historical card's total-spent figure still includes that 300 EUR, even though
+  category A's row in "Category averages" excludes that month
 
-#### Scenario: Projection scales run-rate to the full month
-- **WHEN** the daily run-rate is 15.00 EUR/day and the current month has 30 days
-- **THEN** the displayed full-month projection is 450.00 EUR (15.00 × 30)
+#### Scenario: Per-day and per-month averages divide by the complete months' own spans
+- **WHEN** the complete months are `2026-06` (30 days) and `2026-07` (31 days) with a combined
+  total of 6100 EUR
+- **THEN** the average per day is 6100 / 61 EUR, and the average per month is 6100 / 2 EUR
+
+#### Scenario: No complete months yet
+- **WHEN** no month is yet complete (e.g. a brand-new account)
+- **THEN** the card displays zeroed averages and a zero total rather than dividing by zero or
+  showing `NaN`/`Infinity`
 
 ### Requirement: Negative transactions are included arithmetically, never filtered or absoluted
 A transaction with a negative amount (a refund or reimbursement recorded against its original
-category) SHALL be included in month totals, category subtotals, per-category averages, and the
-daily run-rate using its signed value. The system SHALL NOT filter negative transactions out of
-any of these computations and SHALL NOT convert a negative amount to its absolute value before
-summing.
+category) SHALL be included in month totals, category subtotals, per-category averages, the
+summary block's daily rate, and the historical all-time averages using its signed value. The
+system SHALL NOT filter negative transactions out of any of these computations and SHALL NOT
+convert a negative amount to its absolute value before summing.
 
 #### Scenario: A refund reduces the month total and category subtotal
 - **WHEN** a category has transactions of 5078 and -2000 cents in the viewed month
@@ -184,7 +195,8 @@ summing.
 #### Scenario: A refund in an isDaily category reduces the daily run-rate
 - **WHEN** `isDaily` categories total 150 EUR of ordinary spend and a -20 EUR refund so far in the
   current month, on day 10
-- **THEN** the displayed daily run-rate is 13.00 EUR/day ((150 - 20) / 10)
+- **THEN** the summary block's "Щоденні витрати на 1 день" displays 13.00 EUR/day
+  ((150 - 20) / 10)
 
 ### Requirement: MonthFlag is settable from the month view
 The month view SHALL provide a control to set or change the `MonthFlag` for the viewed month,
@@ -197,8 +209,8 @@ alongside the per-category exclusion toggle, distinct from it.
 
 ### Requirement: Analytics reflect writes without a reload
 Creating, editing, or deleting a transaction — including via Undo — SHALL be reflected in the
-month view, averages view, and daily run-rate without requiring the user to reload or manually
-refresh the app.
+month view (including its projection and Детально sections) and the averages view (including its
+historical all-time card) without requiring the user to reload or manually refresh the app.
 
 #### Scenario: An edit made from the month view updates the displayed total immediately
 - **WHEN** the user edits a transaction's amount from the month view
@@ -256,13 +268,14 @@ continue to list all currently active exclusions and SHALL allow removing any of
 - **THEN** the averages view lists that exclusion, and the user can remove it, after which
   category A's average recomputes to include that month
 
-### Requirement: Month summary block appears in the month view's right sidebar
+### Requirement: Month summary block shows totals, daily rate, and a full-month projection
 The month view SHALL provide a summary block in its right sidebar, shown for whichever month is
-currently selected, with five rows: "Всього" (total of all transactions in the selected month),
-"Не щоденні витрати всього" (total of transactions in non-`isDaily` categories), "Щоденні витрати
-всього" (total of transactions in `isDaily` categories), "Щоденні витрати на 1 день" (the
-daily-category total divided by the day count for the selected month), and "Щоденні витрати
-(місяць)" (the per-day rate projected across the full number of days in the selected month).
+currently selected, with: "Всього" (total of all transactions in the selected month), "Не щоденні
+витрати всього" (total of transactions in non-`isDaily` categories), "Щоденні витрати всього"
+(total of transactions in `isDaily` categories), "Щоденні витрати на 1 день" (the daily-category
+total divided by the day count for the selected month), and "Прогноз до кінця місяця (всього)" (a
+projected full-month total computed per the "Month projection blends daily pace with typical
+non-daily spend" requirement).
 
 #### Scenario: Summary splits daily and non-daily totals
 - **WHEN** the selected month has 800 EUR in `isDaily` categories and 300 EUR in non-`isDaily`
@@ -270,9 +283,30 @@ daily-category total divided by the day count for the selected month), and "Що
 - **THEN** "Всього" displays 1100 EUR, "Щоденні витрати всього" displays 800 EUR, and "Не щоденні
   витрати всього" displays 300 EUR
 
-#### Scenario: Projection uses the full month length regardless of days elapsed
-- **WHEN** the daily rate for the selected month is 76.69 EUR/day and that month has 31 days
-- **THEN** "Щоденні витрати (місяць)" displays 2377.39 EUR (76.69 × 31)
+### Requirement: Month projection blends daily pace with typical non-daily spend
+For the currently selected month, the summary block's "Прогноз до кінця місяця (всього)" figure
+SHALL be computed as: the `isDaily`-category total spent so far this month, plus the current daily
+rate multiplied by the number of days remaining in the month, plus whichever is larger of (a) the
+non-`isDaily` total spent so far this month or (b) the typical monthly non-`isDaily` spend
+computed per the "Historical averages summarize all-time spend" requirement. For a month that has
+already ended (no days remaining), the projection SHALL equal that month's actual total instead.
+
+#### Scenario: Projection carries only the daily pace forward, not one-off spend already booked
+- **WHEN** the selected month is the current month, 16 days have elapsed of 31, `isDaily`
+  categories total 1124.38 EUR so far, and non-`isDaily` categories total 1250.05 EUR so far (already
+  exceeding the typical monthly non-daily amount)
+- **THEN** the projection equals 1124.38 + (1124.38 / 16) × 15 + 1250.05 EUR, not
+  (1124.38 + 1250.05) / 16 × 31 EUR
+
+#### Scenario: Projection budgets for a typical bill that has not landed yet this month
+- **WHEN** the selected month is the current month, the typical monthly non-`isDaily` spend from
+  history is 500 EUR, and only 50 EUR of non-`isDaily` spend has been recorded so far this month
+- **THEN** the projection's non-daily component uses 500 EUR (the historical typical amount), not
+  the 50 EUR spent so far
+
+#### Scenario: Projection equals the actual total for a completed month
+- **WHEN** the selected month is a past, completed month
+- **THEN** "Прогноз до кінця місяця (всього)" displays the same value as "Всього" for that month
 
 ### Requirement: Grouped-category daily averages appear in the month view's right sidebar
 The month view SHALL provide a "Детально" (details) section in its right sidebar, shown for
@@ -310,10 +344,10 @@ categories already present in the database.
 
 ### Requirement: Month sidebar figures use a month-appropriate day divisor and signed-amount handling
 For the current month, the summary block's daily rate and each Детально group's daily average
-SHALL use the same day divisor as the existing daily run-rate — the number of days elapsed in the
-current month, including today (`now.getDate()`). For a past month, the divisor SHALL be the total
-number of days in that month. In all cases the underlying sums SHALL use transactions' signed
-amounts, including negative (refund) transactions, without filtering or taking an absolute value.
+SHALL use a divisor of the number of days elapsed in the current month, including today
+(`now.getDate()`). For a past month, the divisor SHALL be the total number of days in that month.
+In all cases the underlying sums SHALL use transactions' signed amounts, including negative
+(refund) transactions, without filtering or taking an absolute value.
 
 #### Scenario: Divisor matches days elapsed including today, for the current month
 - **WHEN** the selected month is the current month and today is the 1st
