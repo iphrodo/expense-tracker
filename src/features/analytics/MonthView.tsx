@@ -193,6 +193,7 @@ export function MonthView() {
 
   const seenTxIds = useRef<Set<number> | null>(null)
   const [freshTxIds, setFreshTxIds] = useState<Set<number>>(new Set())
+  const [statsOpen, setStatsOpen] = useState(false)
   useEffect(() => {
     const currentIds = new Set(transactions.map((tx) => tx.id))
     if (seenTxIds.current === null) {
@@ -345,7 +346,7 @@ export function MonthView() {
   const nonDailyShare = 100 - dailyShare
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-s5 p-s4 [grid-template-areas:'form'_'rest'_'sidebar'] md:[grid-template-areas:'form_sidebar'_'rest_sidebar'] md:grid-cols-[1.4fr_360px] md:items-start">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-s5 p-s4 [grid-template-areas:'form'_'sidebar'_'rest'] md:[grid-template-areas:'form_sidebar'_'rest_sidebar'] md:grid-cols-[1.4fr_360px] md:items-start">
       <div className="[grid-area:form]">
         <ExpenseEntryForm />
       </div>
@@ -421,6 +422,30 @@ export function MonthView() {
       </div>
 
       <div className="flex w-full flex-col gap-s5 [grid-area:sidebar]">
+        <button
+          type="button"
+          onClick={() => setStatsOpen((v) => !v)}
+          aria-expanded={statsOpen}
+          className="flex items-center justify-between rounded-lg border border-border bg-surface px-s4 py-s3 text-left t-body font-semibold text-text md:hidden"
+        >
+          <span>Статистика місяця</span>
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            fill="none"
+            className={`size-4 shrink-0 text-text-2 transition-transform duration-[120ms] ease-out ${statsOpen ? 'rotate-180' : ''}`}
+          >
+            <path
+              d="M5 7.5L10 12.5L15 7.5"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <div className={`flex-col gap-s5 md:flex ${statsOpen ? 'flex' : 'hidden'}`}>
         <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
           <div className="t-micro text-text-3">Всього</div>
           <div className="t-display mt-1 text-text">{formatCents(monthSummary.totalCents)}</div>
@@ -543,6 +568,7 @@ export function MonthView() {
               </div>
             )
           })}
+        </div>
         </div>
       </div>
 
