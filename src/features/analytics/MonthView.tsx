@@ -154,9 +154,12 @@ function CategoryFilter({ categories, selectedCategoryId, onSelect }: CategoryFi
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="t-meta h-9 rounded-full border border-border bg-surface px-s3 font-semibold text-text hover:bg-surface-2"
+        className="t-meta flex h-9 max-w-40 items-center gap-1 rounded-full border border-border bg-surface px-s3 font-semibold text-text hover:bg-surface-2"
       >
-        {selected ? selected.name : 'All categories'} ▾
+        <span className="min-w-0 truncate">{selected ? selected.name : 'All categories'}</span>
+        <span aria-hidden className="shrink-0">
+          ▾
+        </span>
       </button>
       {open && (
         <>
