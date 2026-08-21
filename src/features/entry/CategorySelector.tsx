@@ -136,6 +136,19 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
       return () => document.removeEventListener('keydown', handleKey)
     }, [open])
 
+    // Lock background scroll while the sheet/dropdown is open. Without this, dragging past the
+    // top/bottom of the category list on iOS Safari chains the scroll to the page behind it,
+    // which — because the panel is `position: fixed` — makes it visibly slide away from its
+    // anchored spot as the page scrolls underneath it.
+    useEffect(() => {
+      if (!open) return
+      const previousOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = previousOverflow
+      }
+    }, [open])
+
     function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -174,7 +187,7 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={closePanel} />
-            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] rounded-t-lg border border-border bg-surface p-s3 shadow-2 min-[900px]:absolute min-[900px]:inset-x-auto min-[900px]:right-0 min-[900px]:bottom-auto min-[900px]:top-[calc(100%+8px)] min-[900px]:max-h-96 min-[900px]:w-80 min-[900px]:rounded-lg">
+            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overscroll-contain rounded-t-lg border border-border bg-surface p-s3 shadow-2 min-[900px]:absolute min-[900px]:inset-x-auto min-[900px]:right-0 min-[900px]:bottom-auto min-[900px]:top-[calc(100%+8px)] min-[900px]:max-h-96 min-[900px]:w-80 min-[900px]:rounded-lg">
               <input
                 ref={inputRef}
                 type="text"
@@ -188,7 +201,7 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
                 aria-label="Search categories"
                 className="h-11 w-full rounded-sm border border-border px-s2 text-sm text-text outline-none focus:outline-none"
               />
-              <ul className="mt-s2 max-h-64 divide-y divide-border overflow-auto text-sm">
+              <ul className="mt-s2 max-h-64 divide-y divide-border overflow-auto overscroll-contain text-sm">
                 {matches.map((c, i) => {
                   const roles = getCategoryColorRoles(c)
                   return (
