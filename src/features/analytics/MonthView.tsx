@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Transaction } from '../../db/schema'
+import type { Category, Transaction } from '../../db/schema'
 import { computeHistoricalTotals, computeMonthSummary, computeNamedCategoryDailyAverages, monthOf } from '../../lib/averages'
 import { rankCategoriesByCount } from '../../lib/categoryRanking'
+import { groupTransactionsByDay } from '../../lib/dateGroups'
 import { formatCents } from '../../lib/money'
 import { getCategoryColorRoles } from '../../lib/categoryColor'
 import {
@@ -137,6 +138,84 @@ function MonthPicker({ selectedYear, selectedMonthIndex, years, monthIndexesByYe
   )
 }
 
+interface CategoryFilterProps {
+  categories: Category[]
+  selectedCategoryId: number | null
+  onSelect: (categoryId: number | null) => void
+}
+
+function CategoryFilter({ categories, selectedCategoryId, onSelect }: CategoryFilterProps) {
+  const [open, setOpen] = useState(false)
+  const selected = categories.find((c) => c.id === selectedCategoryId)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="t-meta h-9 rounded-full border border-border bg-surface px-s3 font-semibold text-text hover:bg-surface-2"
+      >
+        {selected ? selected.name : 'All categories'} ▾
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close category filter"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div className="absolute z-20 mt-s2 w-56 rounded-lg border border-border bg-surface p-s2 shadow-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSelect(null)
+                setOpen(false)
+              }}
+              className={`t-meta flex w-full items-center rounded-md px-s2 py-s2 text-left ${
+                selectedCategoryId === null
+                  ? 'bg-accent-weak font-semibold text-accent-text'
+                  : 'text-text hover:bg-surface-2'
+              }`}
+            >
+              All categories
+            </button>
+            <div className="mt-s1 max-h-64 overflow-auto">
+              {categories.map((c) => {
+                const roles = getCategoryColorRoles(c)
+                const active = c.id === selectedCategoryId
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      if (c.id !== undefined) {
+                        onSelect(c.id)
+                        setOpen(false)
+                      }
+                    }}
+                    className={`t-meta flex w-full items-center gap-s2 rounded-md px-s2 py-s2 text-left ${
+                      active ? 'bg-accent-weak font-semibold text-accent-text' : 'text-text hover:bg-surface-2'
+                    }`}
+                  >
+                    <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: roles.dot }} />
+                    {c.name}
+                  </button>
+                )
+              })}
+              {categories.length === 0 && (
+                <p className="px-s2 py-s2 text-xs text-text-3">No categories this month</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 type BreakdownRow = { categoryId: number; name: string; subtotalCents: number }
 
 function sortRows(rows: BreakdownRow[]): BreakdownRow[] {
@@ -151,6 +230,7 @@ export function MonthView() {
   const { showErrorToast } = useToast()
 
   const [month, setMonth] = useState(currentMonthIso())
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [exclusionDialog, setExclusionDialog] = useState<
     { categoryId: number; mode: 'exclude' | 'include' } | null
@@ -168,26 +248,21 @@ export function MonthView() {
     [transactions, month],
   )
 
-  const sortedTransactions = useMemo(() => {
-    return [...monthTransactions].sort((a, b) => {
-      if (a.date !== b.date) return a.date < b.date ? 1 : -1
-      return b.id - a.id
-    })
-  }, [monthTransactions])
+  const dateGroups = useMemo(
+    () => groupTransactionsByDay(monthTransactions, selectedCategoryId),
+    [monthTransactions, selectedCategoryId],
+  )
 
-  const dateGroups = useMemo(() => {
-    const groups: { date: string; txs: Transaction[]; totalCents: number }[] = []
-    for (const tx of sortedTransactions) {
-      const last = groups[groups.length - 1]
-      if (last && last.date === tx.date) {
-        last.txs.push(tx)
-        last.totalCents += tx.amountCents
-      } else {
-        groups.push({ date: tx.date, txs: [tx], totalCents: tx.amountCents })
-      }
+  const filterableCategories = useMemo(() => {
+    const idsWithTx = new Set(monthTransactions.map((tx) => tx.categoryId))
+    return rankedCategories.filter((c) => c.id !== undefined && idsWithTx.has(c.id))
+  }, [rankedCategories, monthTransactions])
+
+  useEffect(() => {
+    if (selectedCategoryId !== null && !categoryById.has(selectedCategoryId)) {
+      setSelectedCategoryId(null)
     }
-    return groups
-  }, [sortedTransactions])
+  }, [selectedCategoryId, categoryById])
 
   const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
 
@@ -346,7 +421,7 @@ export function MonthView() {
   const nonDailyShare = 100 - dailyShare
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-s5 p-s4 [grid-template-areas:'form'_'sidebar'_'rest'] md:[grid-template-areas:'form_sidebar'_'rest_sidebar'] md:grid-cols-[1.4fr_360px] md:items-start">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-s5 p-s4 [grid-template-areas:'form'_'sidebar'_'rest'] md:[grid-template-areas:'form_sidebar'_'rest_sidebar'] md:grid-cols-[1.4fr_360px] md:grid-rows-[auto_1fr] md:items-start">
       <div className="[grid-area:form]">
         <ExpenseEntryForm />
       </div>
@@ -374,6 +449,11 @@ export function MonthView() {
             >
               {monthFlag ? (monthFlag.isComplete ? 'Marked complete' : 'Marked incomplete') : 'Mark complete/incomplete'}
             </button>
+            <CategoryFilter
+              categories={filterableCategories}
+              selectedCategoryId={selectedCategoryId}
+              onSelect={setSelectedCategoryId}
+            />
           </div>
           <div className="text-right">
             <div className="t-micro text-text-3">TOTAL</div>
@@ -382,7 +462,11 @@ export function MonthView() {
         </div>
 
         {dateGroups.length === 0 && (
-          <p className="t-body py-s5 text-center text-text-2">No transactions this month.</p>
+          <p className="t-body py-s5 text-center text-text-2">
+            {selectedCategoryId !== null
+              ? `No ${categoryById.get(selectedCategoryId)?.name ?? ''} transactions this month.`
+              : 'No transactions this month.'}
+          </p>
         )}
 
         {dateGroups.map((group) => (
