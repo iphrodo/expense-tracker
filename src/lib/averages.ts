@@ -21,17 +21,26 @@ function isMonthComplete(month: string, now: Date, monthFlags: MonthFlag[]): boo
 export interface AverageRow {
   categoryId: number
   total: number
+  periodTotal: number
   monthsCounted: number
+  averageDivisorMonths: number
   average: number | null
 }
+
+const EQUIPMENT_CATEGORY_NAME = 'Техніка'
+const EQUIPMENT_LIFETIME_MONTHS = 5 * 12
 
 export function computeAverages(
   transactions: Transaction[],
   exclusions: AverageExclusion[],
   monthFlags: MonthFlag[],
   now: Date,
+  categories: Category[] = [],
 ): AverageRow[] {
   const exclusionKeys = new Set(exclusions.map((e) => `${e.categoryId}|${e.month}`))
+  const equipmentCategoryIds = new Set(
+    categories.filter((category) => category.name === EQUIPMENT_CATEGORY_NAME).map((category) => category.id),
+  )
 
   const eligible = transactions.filter((tx) => {
     const month = monthOf(tx.date)
@@ -53,6 +62,17 @@ export function computeAverages(
     totalsByCategory.set(tx.categoryId, (totalsByCategory.get(tx.categoryId) ?? 0) + tx.amountCents)
   }
 
+  const periodTotalsByCategory = new Map<number, number>()
+  for (const tx of transactions) {
+    if (!allMonths.has(monthOf(tx.date))) {
+      continue
+    }
+    periodTotalsByCategory.set(
+      tx.categoryId,
+      (periodTotalsByCategory.get(tx.categoryId) ?? 0) + tx.amountCents,
+    )
+  }
+
   const excludedMonthsByCategory = new Map<number, number>()
   for (const e of exclusions) {
     if (!allMonths.has(e.month)) {
@@ -62,13 +82,19 @@ export function computeAverages(
   }
 
   const rows: AverageRow[] = []
-  for (const [categoryId, total] of totalsByCategory) {
+  for (const [categoryId, periodTotal] of periodTotalsByCategory) {
+    const total = totalsByCategory.get(categoryId) ?? 0
     const monthsCounted = allMonths.size - (excludedMonthsByCategory.get(categoryId) ?? 0)
+    const averageDivisorMonths = equipmentCategoryIds.has(categoryId)
+      ? EQUIPMENT_LIFETIME_MONTHS
+      : monthsCounted
     rows.push({
       categoryId,
       total,
+      periodTotal,
       monthsCounted,
-      average: monthsCounted <= 0 ? null : total / monthsCounted,
+      averageDivisorMonths,
+      average: monthsCounted <= 0 ? null : total / averageDivisorMonths,
     })
   }
   return rows

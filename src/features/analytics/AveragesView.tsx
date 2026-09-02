@@ -31,8 +31,8 @@ export function AveragesView() {
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
   const averageRows = useMemo(
-    () => computeAverages(transactions, exclusions, monthFlags, now),
-    [transactions, exclusions, monthFlags, now],
+    () => computeAverages(transactions, exclusions, monthFlags, now, categories),
+    [transactions, exclusions, monthFlags, now, categories],
   )
 
   const sortedAverageRows = useMemo(() => {
@@ -89,9 +89,10 @@ export function AveragesView() {
             A–Z
           </button>
         </div>
-        <div className="sticky top-0 flex border-b border-border bg-surface pb-s2">
+        <div className="sticky top-0 flex gap-s2 border-b border-border bg-surface pb-s2">
           <span className="t-micro flex-1 text-text-3">CATEGORY</span>
-          <span className="t-micro text-text-3">AVERAGE / MO</span>
+          <span className="t-micro w-20 shrink-0 text-right text-text-3">TOTAL</span>
+          <span className="t-micro w-20 shrink-0 text-right text-text-3">AVERAGE / MO</span>
         </div>
         {sortedAverageRows.map((row) => {
           const category = categoryById.get(row.categoryId)
@@ -104,9 +105,12 @@ export function AveragesView() {
               <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: roles.dot }} />
               <div className="min-w-0 flex-1">
                 <div className="t-body truncate text-text">{category?.name ?? 'Unknown'}</div>
-                <div className="t-micro text-text-3 sm:hidden">{row.monthsCounted} months</div>
+                <div className="t-micro text-text-3 sm:hidden">{row.averageDivisorMonths} months</div>
               </div>
-              <span className="t-micro hidden text-text-3 sm:inline">{row.monthsCounted} months</span>
+              <span className="t-micro hidden text-text-3 sm:inline">{row.averageDivisorMonths} months</span>
+              <span className="t-num tabular-amount w-20 shrink-0 text-right text-text">
+                {formatCents(row.periodTotal)} €
+              </span>
               <span className="t-num tabular-amount w-20 shrink-0 text-right text-text">
                 {row.average === null ? '—' : `${formatCents(row.average)} €`}
               </span>
