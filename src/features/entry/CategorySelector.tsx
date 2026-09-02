@@ -96,13 +96,15 @@ export function CategoryChipsRow({
 interface CategoryAllPickerProps extends CategoryPickerProps {
   label: ReactNode
   className?: string
+  /** History/filter contexts select existing categories only. */
+  allowCreate?: boolean
 }
 
 /** Trigger pill that opens the full searchable category picker (a bottom sheet on mobile,
  *  a dropdown on desktop via CSS breakpoint), with keyboard nav and inline category creation. */
 export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllPickerProps>(
   function CategoryAllPicker(
-    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit, label, className = '' },
+    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit, label, className = '', allowCreate = true },
     handleRef,
   ) {
     const [open, setOpen] = useState(false)
@@ -230,7 +232,7 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
                     </li>
                   )
                 })}
-                {query.trim() !== '' && matches.length === 0 && (
+                {allowCreate && query.trim() !== '' && matches.length === 0 && (
                   <li>
                     <button
                       type="button"
