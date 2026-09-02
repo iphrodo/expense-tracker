@@ -7,6 +7,7 @@ import { CategoryHistoryView } from './features/analytics/CategoryHistoryView'
 import { ImportExportScreen } from './features/import/ImportExportScreen'
 import { CategoriesScreen } from './features/categories/CategoriesScreen'
 import { supabase } from './lib/supabase'
+import { applyTheme, getInitialTheme, type Theme } from './lib/theme'
 
 type Screen = 'month' | 'history' | 'averages' | 'categories' | 'import'
 
@@ -26,6 +27,7 @@ const MOBILE_ITEMS: { id: Extract<Screen, 'month' | 'history' | 'averages'>; lab
 
 function App() {
   const [screen, setScreen] = useState<Screen>('month')
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [moreOpen, setMoreOpen] = useState(false)
   const moreTriggerRef = useRef<HTMLButtonElement>(null)
   const moreFirstActionRef = useRef<HTMLButtonElement>(null)
@@ -53,7 +55,16 @@ function App() {
     setScreen(nextScreen)
   }
 
+  function toggleTheme() {
+    const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark'
+    applyTheme(nextTheme, true)
+    setTheme(nextTheme)
+  }
+
   const moreActive = screen === 'categories' || screen === 'import'
+  const isLightTheme = theme === 'light'
+  const themeActionLabel = isLightTheme ? 'Увімкнути темну тему' : 'Увімкнути світлу тему'
+  const themeButtonLabel = isLightTheme ? 'Темна тема' : 'Світла тема'
 
   return (
     <ToastProvider>
@@ -77,8 +88,19 @@ function App() {
             </div>
             <button
               type="button"
+              onClick={toggleTheme}
+              aria-pressed={isLightTheme}
+              aria-label={themeActionLabel}
+              title={themeActionLabel}
+              className="t-meta ml-auto inline-flex h-9 items-center gap-s2 rounded-md px-s2 text-text-2 hover:bg-surface-2 hover:text-text"
+            >
+              <span aria-hidden>{isLightTheme ? '◐' : '☀'}</span>
+              {themeButtonLabel}
+            </button>
+            <button
+              type="button"
               onClick={() => void supabase.auth.signOut()}
-              className="t-meta ml-auto text-text-3 hover:text-text-2"
+              className="t-meta text-text-3 hover:text-text-2"
             >
               Sign out
             </button>
@@ -92,6 +114,7 @@ function App() {
           {moreOpen && <section id="more-menu" aria-label="Ще" className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-s3 right-s3 z-40 rounded-lg border border-border bg-surface p-s2 shadow-2 md:hidden">
             <button ref={moreFirstActionRef} type="button" onClick={() => navigate('categories')} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Категорії</button>
             <button type="button" onClick={() => navigate('import')} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Імпорт / експорт</button>
+            <button type="button" onClick={toggleTheme} aria-pressed={isLightTheme} aria-label={themeActionLabel} className="t-body flex min-h-11 w-full items-center gap-s2 rounded-md px-s3 text-left text-text hover:bg-surface-2"><span aria-hidden>{isLightTheme ? '◐' : '☀'}</span>{themeButtonLabel}</button>
             <button type="button" onClick={() => { closeMore(); void supabase.auth.signOut() }} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Вийти</button>
           </section>}
           <nav aria-label="Основна навігація" className="fixed bottom-0 left-0 right-0 z-40 flex h-[calc(64px+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface pt-s1 md:hidden">
