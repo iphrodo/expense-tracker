@@ -29,6 +29,38 @@ export interface AverageRow {
 
 const EQUIPMENT_CATEGORY_NAME = 'Техніка'
 const EQUIPMENT_LIFETIME_MONTHS = 5 * 12
+const FOOD_CATEGORY_NAMES = new Set([
+  'Продукти',
+  'Іжа в закладі',
+  'Іжа на виніс',
+  'Алкоголь',
+  'Снеки',
+  'Солодке',
+])
+
+export interface FoodAverageSummary {
+  totalCents: number
+  monthlyAverageCents: number | null
+}
+
+export function computeFoodAverageSummary(
+  rows: AverageRow[],
+  categories: Category[],
+): FoodAverageSummary {
+  const foodCategoryIds = new Set(
+    categories.filter((category) => FOOD_CATEGORY_NAMES.has(category.name)).map((category) => category.id),
+  )
+  const foodRows = rows.filter((row) => foodCategoryIds.has(row.categoryId))
+  const rowsWithAverage = foodRows.filter((row) => row.average !== null)
+
+  return {
+    totalCents: foodRows.reduce((sum, row) => sum + row.periodTotal, 0),
+    monthlyAverageCents:
+      rowsWithAverage.length === 0
+        ? null
+        : rowsWithAverage.reduce((sum, row) => sum + (row.average ?? 0), 0),
+  }
+}
 
 export function computeAverages(
   transactions: Transaction[],

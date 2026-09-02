@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { computeAverages, computeHistoricalTotals } from '../../lib/averages'
+import { computeAverages, computeFoodAverageSummary, computeHistoricalTotals } from '../../lib/averages'
 import { formatCents } from '../../lib/money'
 import {
   removeExclusion,
@@ -47,6 +47,11 @@ export function AveragesView() {
     return rows
   }, [averageRows, sortMode, categoryById])
 
+  const foodAverageSummary = useMemo(
+    () => computeFoodAverageSummary(averageRows, categories),
+    [averageRows, categories],
+  )
+
   const historicalTotals = useMemo(
     () => computeHistoricalTotals(transactions, categories, monthFlags, now),
     [transactions, categories, monthFlags, now],
@@ -73,6 +78,24 @@ export function AveragesView() {
               : `Всього витрачено (${historicalTotals.firstMonth}–${historicalTotals.lastMonth}, ${historicalTotals.monthsCount} міс.)`}
           </span>
           <span className="t-num-lg text-text">{formatCents(historicalTotals.totalCents)}</span>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-s4 shadow-1">
+        <div className="t-micro text-text-3">ХАРЧУВАННЯ</div>
+        <div className="mt-s3 flex gap-s3">
+          <div className="flex-1">
+            <div className="t-num-lg text-text">{formatCents(foodAverageSummary.totalCents)}</div>
+            <div className="t-micro mt-0.5 text-text-3">€ всього за період</div>
+          </div>
+          <div className="flex-1 text-right">
+            <div className="t-num-lg text-text">
+              {foodAverageSummary.monthlyAverageCents === null
+                ? '—'
+                : formatCents(foodAverageSummary.monthlyAverageCents)}
+            </div>
+            <div className="t-micro mt-0.5 text-text-3">€/місяць (в середньому)</div>
+          </div>
         </div>
       </div>
 
