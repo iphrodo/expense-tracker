@@ -31,6 +31,7 @@ describe('computeAverages', () => {
     const rowB = rows.find((r) => r.categoryId === 2)
     // Five distinct months (Jan-May) are tracked overall, so both categories divide by 5.
     expect(rowA?.monthsCounted).toBe(5)
+    expect(rowA?.averageDivisorMonths).toBe(5)
     expect(rowA?.average).toBe(600)
     expect(rowB?.monthsCounted).toBe(5)
     expect(rowB?.average).toBe(900)
@@ -50,10 +51,11 @@ describe('computeAverages', () => {
     // 4 tracked months minus 1 excluded month = 3.
     expect(rowA?.monthsCounted).toBe(3)
     expect(rowA?.total).toBe(3000)
+    expect(rowA?.periodTotal).toBe(4000)
     expect(rowA?.average).toBe(1000)
   })
 
-  it('guards division by zero when every tracked month is excluded for a category', () => {
+  it('shows the unexcluded period total when every tracked month is excluded from the average', () => {
     const now = new Date('2026-06-15')
     const transactions: Transaction[] = [
       tx({ categoryId: 1, date: '2026-01-05', amountCents: 1000 }),
@@ -64,7 +66,35 @@ describe('computeAverages', () => {
       { id: 2, categoryId: 1, month: '2026-02', reason: '' },
     ]
     const rows = computeAverages(transactions, exclusions, [], now)
-    expect(rows).toHaveLength(0)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      categoryId: 1,
+      total: 0,
+      periodTotal: 2000,
+      monthsCounted: 0,
+      averageDivisorMonths: 0,
+      average: null,
+    })
+  })
+
+  it('spreads equipment spending over its five-year lifetime', () => {
+    const now = new Date('2026-06-15')
+    const transactions: Transaction[] = [
+      tx({ categoryId: 22, date: '2026-01-05', amountCents: 120000 }),
+      tx({ categoryId: 22, date: '2026-02-05', amountCents: -6000 }),
+    ]
+    const categories = [{ id: 22, name: 'Техніка', isDaily: false }]
+
+    const rows = computeAverages(transactions, [], [], now, categories)
+
+    expect(rows[0]).toMatchObject({
+      categoryId: 22,
+      total: 114000,
+      periodTotal: 114000,
+      monthsCounted: 2,
+      averageDivisorMonths: 60,
+      average: 1900,
+    })
   })
 
   it('excludes the current month from averages unless a MonthFlag override says complete', () => {
@@ -109,6 +139,7 @@ describe('computeAverages', () => {
     const rowA = rows.find((r) => r.categoryId === 1)
     expect(rowA?.monthsCounted).toBe(2)
     expect(rowA?.total).toBe(16000)
+    expect(rowA?.periodTotal).toBe(16000)
     expect(rowA?.average).toBe(8000)
   })
 })
