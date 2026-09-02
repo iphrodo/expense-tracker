@@ -124,7 +124,7 @@ export function EditTransactionPanel({
             <button
               type="button"
               onClick={() => void handleSave()}
-              className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
+              className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-press"
             >
               Save
             </button>

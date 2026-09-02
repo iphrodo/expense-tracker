@@ -98,7 +98,7 @@ export function CategoryForm({
             type="button"
             onClick={() => void handleSubmit()}
             disabled={saving}
-            className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-white hover:bg-accent-hover active:bg-accent-press disabled:opacity-50"
+            className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-press disabled:opacity-50"
           >
             Save
           </button>
