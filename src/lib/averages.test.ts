@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AverageExclusion, MonthFlag, Transaction } from '../db/schema'
 import {
   computeAverages,
+  computeFoodAverageSummary,
   computeHistoricalTotals,
   computeMonthSummary,
   computeNamedCategoryDailyAverages,
@@ -94,6 +95,29 @@ describe('computeAverages', () => {
       monthsCounted: 2,
       averageDivisorMonths: 60,
       average: 1900,
+    })
+  })
+
+  it('summarizes food categories separately using unexcluded totals and their individual averages', () => {
+    const now = new Date('2026-03-15')
+    const categories = [
+      { id: 1, name: 'Продукти', isDaily: true },
+      { id: 2, name: 'Алкоголь', isDaily: true },
+      { id: 3, name: 'Транспорт', isDaily: true },
+    ]
+    const transactions: Transaction[] = [
+      tx({ categoryId: 1, date: '2026-01-05', amountCents: 1000 }),
+      tx({ categoryId: 2, date: '2026-02-05', amountCents: 2000 }),
+      tx({ categoryId: 3, date: '2026-01-10', amountCents: 9000 }),
+    ]
+    const exclusions: AverageExclusion[] = [
+      { id: 1, categoryId: 2, month: '2026-02', reason: 'event' },
+    ]
+    const rows = computeAverages(transactions, exclusions, [], now, categories)
+
+    expect(computeFoodAverageSummary(rows, categories)).toEqual({
+      totalCents: 3000,
+      monthlyAverageCents: 500,
     })
   })
 
