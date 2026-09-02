@@ -1,23 +1,59 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ToastProvider } from './app/ToastProvider'
 import { AuthGate } from './features/auth/AuthGate'
 import { MonthView } from './features/analytics/MonthView'
 import { AveragesView } from './features/analytics/AveragesView'
+import { CategoryHistoryView } from './features/analytics/CategoryHistoryView'
 import { ImportExportScreen } from './features/import/ImportExportScreen'
 import { CategoriesScreen } from './features/categories/CategoriesScreen'
 import { supabase } from './lib/supabase'
 
-type Screen = 'month' | 'averages' | 'categories' | 'import'
+type Screen = 'month' | 'history' | 'averages' | 'categories' | 'import'
 
 const NAV_ITEMS: { id: Screen; label: string }[] = [
   { id: 'month', label: 'Month' },
+  { id: 'history', label: 'History' },
   { id: 'averages', label: 'Averages' },
   { id: 'categories', label: 'Categories' },
   { id: 'import', label: 'Import / Export' },
 ]
 
+const MOBILE_ITEMS: { id: Extract<Screen, 'month' | 'history' | 'averages'>; label: string; icon: string }[] = [
+  { id: 'month', label: 'Місяць', icon: '□' },
+  { id: 'history', label: 'Історія', icon: '◷' },
+  { id: 'averages', label: 'Середні', icon: '⌁' },
+]
+
 function App() {
   const [screen, setScreen] = useState<Screen>('month')
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreTriggerRef = useRef<HTMLButtonElement>(null)
+  const moreFirstActionRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!moreOpen) return
+    moreFirstActionRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMoreOpen(false)
+        requestAnimationFrame(() => moreTriggerRef.current?.focus())
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [moreOpen])
+
+  function closeMore(returnFocus = false) {
+    setMoreOpen(false)
+    if (returnFocus) requestAnimationFrame(() => moreTriggerRef.current?.focus())
+  }
+
+  function navigate(nextScreen: Screen) {
+    closeMore()
+    setScreen(nextScreen)
+  }
+
+  const moreActive = screen === 'categories' || screen === 'import'
 
   return (
     <ToastProvider>
@@ -30,7 +66,7 @@ function App() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setScreen(item.id)}
+                  onClick={() => navigate(item.id)}
                   className={`t-body h-9 rounded-full px-s3 font-semibold transition-colors duration-[120ms] ease-out ${
                     screen === item.id ? 'bg-surface text-text shadow-1' : 'text-text-2 hover:text-text'
                   }`}
@@ -49,30 +85,31 @@ function App() {
           </header>
 
           <main className="pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
-            {screen === 'month' ? (
-              <MonthView />
-            ) : screen === 'averages' ? (
-              <AveragesView />
-            ) : screen === 'categories' ? (
-              <CategoriesScreen />
-            ) : (
-              <ImportExportScreen />
-            )}
+            {screen === 'month' ? <MonthView /> : screen === 'history' ? <CategoryHistoryView /> : screen === 'averages' ? <AveragesView /> : screen === 'categories' ? <CategoriesScreen /> : <ImportExportScreen />}
           </main>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-            {NAV_ITEMS.map((item) => (
+          {moreOpen && <button type="button" aria-label="Закрити меню Ще" className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={() => closeMore(true)} />}
+          {moreOpen && <section id="more-menu" aria-label="Ще" className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-s3 right-s3 z-40 rounded-lg border border-border bg-surface p-s2 shadow-2 md:hidden">
+            <button ref={moreFirstActionRef} type="button" onClick={() => navigate('categories')} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Категорії</button>
+            <button type="button" onClick={() => navigate('import')} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Імпорт / експорт</button>
+            <button type="button" onClick={() => { closeMore(); void supabase.auth.signOut() }} className="t-body flex min-h-11 w-full items-center rounded-md px-s3 text-left text-text hover:bg-surface-2">Вийти</button>
+          </section>}
+          <nav aria-label="Основна навігація" className="fixed bottom-0 left-0 right-0 z-40 flex h-[calc(64px+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface pt-s1 md:hidden">
+            {MOBILE_ITEMS.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setScreen(item.id)}
-                className={`t-micro flex h-11 min-w-11 flex-1 items-center justify-center normal-case ${
+                aria-current={screen === item.id ? 'page' : undefined}
+                onClick={() => navigate(item.id)}
+                className={`t-micro flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 normal-case ${
                   screen === item.id ? 'font-semibold text-accent' : 'text-text-3'
                 }`}
               >
+                <span aria-hidden className="text-base leading-none">{item.icon}</span>
                 {item.label}
               </button>
             ))}
+            <button ref={moreTriggerRef} type="button" aria-current={moreActive ? 'page' : undefined} aria-expanded={moreOpen} aria-controls="more-menu" onClick={() => setMoreOpen((open) => !open)} className={`t-micro flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 normal-case ${moreActive || moreOpen ? 'font-semibold text-accent' : 'text-text-3'}`}><span aria-hidden className="text-base leading-none">•••</span>Ще</button>
           </nav>
         </div>
       </AuthGate>
