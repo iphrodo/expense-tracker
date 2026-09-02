@@ -1,26 +1,23 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Neutrals */
-  --color-bg: #fbfbfa;
-  --color-surface: #ffffff;
-  --color-surface-2: #f4f4f2;
-  --color-border: #e7e7e3;
-  --color-border-strong: #d6d6d1;
-  --color-text: #16181a;
-  --color-text-2: #5c6166;
-  --color-text-3: #8b9096;
-
-  /* Accent (single accent color) */
-  --color-accent: #0e8a5f;
-  --color-accent-hover: #0b7350;
-  --color-accent-press: #095f42;
-  --color-accent-weak: #e6f4ee;
-  --color-accent-text: #076046;
-
-  /* Error */
-  --color-error: #b42318;
-  --color-error-weak: #fef3f2;
+  /* Semantic colors resolve to the active scheme below. */
+  --color-bg: var(--app-color-bg);
+  --color-surface: var(--app-color-surface);
+  --color-surface-2: var(--app-color-surface-2);
+  --color-border: var(--app-color-border);
+  --color-border-strong: var(--app-color-border-strong);
+  --color-text: var(--app-color-text);
+  --color-text-2: var(--app-color-text-2);
+  --color-text-3: var(--app-color-text-3);
+  --color-accent: var(--app-color-accent);
+  --color-accent-hover: var(--app-color-accent-hover);
+  --color-accent-press: var(--app-color-accent-press);
+  --color-accent-weak: var(--app-color-accent-weak);
+  --color-accent-text: var(--app-color-accent-text);
+  --color-error: var(--app-color-error);
+  --color-error-weak: var(--app-color-error-weak);
+  --color-on-accent: var(--app-color-on-accent);
 
   /* Radius scale (overrides Tailwind defaults so rounded-sm/md/lg match tokens) */
   --radius-sm: 8px;
@@ -42,7 +39,43 @@
 }
 
 :root {
+  color-scheme: dark;
+  --app-color-bg: #111315;
+  --app-color-surface: #1a1d20;
+  --app-color-surface-2: #25292d;
+  --app-color-border: #34393e;
+  --app-color-border-strong: #4b535b;
+  --app-color-text: #f1f3f4;
+  --app-color-text-2: #b8bec5;
+  --app-color-text-3: #8b949e;
+  --app-color-accent: #35c58a;
+  --app-color-accent-hover: #55d59f;
+  --app-color-accent-press: #20a974;
+  --app-color-accent-weak: #153b2d;
+  --app-color-accent-text: #82e7b7;
+  --app-color-error: #ff8d85;
+  --app-color-error-weak: #4a201f;
+  --app-color-on-accent: #06281c;
+}
+
+:root[data-theme='light'] {
   color-scheme: light;
+  --app-color-bg: #fbfbfa;
+  --app-color-surface: #ffffff;
+  --app-color-surface-2: #f4f4f2;
+  --app-color-border: #e7e7e3;
+  --app-color-border-strong: #d6d6d1;
+  --app-color-text: #16181a;
+  --app-color-text-2: #5c6166;
+  --app-color-text-3: #8b9096;
+  --app-color-accent: #0e8a5f;
+  --app-color-accent-hover: #0b7350;
+  --app-color-accent-press: #095f42;
+  --app-color-accent-weak: #e6f4ee;
+  --app-color-accent-text: #076046;
+  --app-color-error: #b42318;
+  --app-color-error-weak: #fef3f2;
+  --app-color-on-accent: #ffffff;
 }
 
 body {

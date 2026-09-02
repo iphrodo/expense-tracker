@@ -5,7 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111315" />
     <title>Expense Tracker</title>
+    <script>
+      (() => {
+        const storageKey = 'expense-tracker.theme'
+        let theme = 'dark'
+        try {
+          const storedTheme = window.localStorage.getItem(storageKey)
+          if (storedTheme === 'dark' || storedTheme === 'light') theme = storedTheme
+        } catch {
+          // Storage can be unavailable in private or restricted browser contexts.
+        }
+        document.documentElement.dataset.theme = theme
+        document.querySelector('meta[name="theme-color"]')?.setAttribute(
+          'content',
+          theme === 'dark' ? '#111315' : '#fbfbfa',
+        )
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

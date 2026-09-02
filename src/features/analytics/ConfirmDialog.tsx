@@ -40,7 +40,7 @@ export function ConfirmDialog({ title, initialReason, onConfirm, onClose }: Conf
           <button
             type="button"
             onClick={() => onConfirm(reason)}
-            className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
+            className="t-body h-11 rounded-md bg-accent px-s3 font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-press"
           >
             Confirm
           </button>

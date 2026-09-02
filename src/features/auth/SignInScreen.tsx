@@ -19,14 +19,14 @@ export function SignInScreen() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-white p-4 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="flex min-h-svh items-center justify-center bg-bg p-4 text-text">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xs space-y-4 rounded-lg border border-neutral-200 p-6 dark:border-neutral-800"
+        className="w-full max-w-xs space-y-4 rounded-lg border border-border bg-surface p-6 shadow-1"
       >
         <h1 className="text-lg font-semibold">Sign in</h1>
         <div className="space-y-1">
-          <label htmlFor="email" className="block text-sm text-neutral-600 dark:text-neutral-400">
+          <label htmlFor="email" className="block text-sm text-text-2">
             Email
           </label>
           <input
@@ -36,13 +36,13 @@ export function SignInScreen() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
           <label
             htmlFor="password"
-            className="block text-sm text-neutral-600 dark:text-neutral-400"
+            className="block text-sm text-text-2"
           >
             Password
           </label>
@@ -53,14 +53,14 @@ export function SignInScreen() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
           />
         </div>
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-error">{error}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="w-full rounded bg-accent px-3 py-2 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-50"
         >
           {isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
