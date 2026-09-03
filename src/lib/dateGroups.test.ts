@@ -17,8 +17,8 @@ describe('groupTransactionsByDay', () => {
     ]
     const groups = groupTransactionsByDay(transactions, null)
     expect(groups.map((g) => g.date)).toEqual(['2026-01-02', '2026-01-01'])
-    expect(groups[1]!.totalCents).toBe(150)
-    expect(groups[1]!.txs).toHaveLength(2)
+    expect(groups[1]?.totalCents).toBe(150)
+    expect(groups[1]?.txs).toHaveLength(2)
   })
 
   it('restricts day groups to only those containing the selected category', () => {
@@ -38,8 +38,8 @@ describe('groupTransactionsByDay', () => {
     ]
     const groups = groupTransactionsByDay(transactions, 1)
     expect(groups).toHaveLength(1)
-    expect(groups[0]!.totalCents).toBe(350)
-    expect(groups[0]!.txs.map((t) => t.categoryId)).toEqual([1])
+    expect(groups[0]?.totalCents).toBe(350)
+    expect(groups[0]?.txs.map((t) => t.categoryId)).toEqual([1])
   })
 
   it('returns no groups when the selected category has no transactions', () => {
@@ -55,8 +55,8 @@ describe('groupTransactionsByDay', () => {
     ]
     const groups = groupTransactionsByDay(transactions, null)
     expect(groups).toHaveLength(1)
-    expect(groups[0]!.totalCents).toBe(1550)
-    expect(groups[0]!.txs).toHaveLength(2)
+    expect(groups[0]?.totalCents).toBe(1550)
+    expect(groups[0]?.txs).toHaveLength(2)
   })
 })
 

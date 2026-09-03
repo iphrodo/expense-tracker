@@ -57,18 +57,19 @@ function MonthPicker({ selectedYear, selectedMonthIndex, years, monthIndexesByYe
   const [open, setOpen] = useState(false)
   const [viewYear, setViewYear] = useState(selectedYear)
 
-  useEffect(() => {
-    if (open) setViewYear(selectedYear)
-  }, [open, selectedYear])
-
   const yearIndex = years.indexOf(viewYear)
+  const previousYear = yearIndex > 0 ? years[yearIndex - 1] : undefined
+  const nextYear = yearIndex >= 0 ? years[yearIndex + 1] : undefined
   const availableMonths = new Set(monthIndexesByYear.get(viewYear) ?? [])
 
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) setViewYear(selectedYear)
+          setOpen((value) => !value)
+        }}
         aria-expanded={open}
         className="t-meta h-9 rounded-full border border-border bg-surface px-s3 font-semibold text-text hover:bg-surface-2"
       >
@@ -87,8 +88,8 @@ function MonthPicker({ selectedYear, selectedMonthIndex, years, monthIndexesByYe
             <div className="mb-s2 flex items-center justify-between">
               <button
                 type="button"
-                disabled={yearIndex <= 0}
-                onClick={() => setViewYear(years[yearIndex - 1]!)}
+                disabled={previousYear === undefined}
+                onClick={() => previousYear !== undefined && setViewYear(previousYear)}
                 className="t-body h-8 w-8 rounded-md text-text-2 hover:bg-surface-2 disabled:opacity-30"
                 aria-label="Previous year"
               >
@@ -97,8 +98,8 @@ function MonthPicker({ selectedYear, selectedMonthIndex, years, monthIndexesByYe
               <span className="t-body font-semibold text-text">{viewYear}</span>
               <button
                 type="button"
-                disabled={yearIndex === -1 || yearIndex >= years.length - 1}
-                onClick={() => setViewYear(years[yearIndex + 1]!)}
+                disabled={nextYear === undefined}
+                onClick={() => nextYear !== undefined && setViewYear(nextYear)}
                 className="t-body h-8 w-8 rounded-md text-text-2 hover:bg-surface-2 disabled:opacity-30"
                 aria-label="Next year"
               >
@@ -233,13 +234,17 @@ export function MonthView() {
   const { showErrorToast } = useToast()
 
   const [month, setMonth] = useState(currentMonthIso())
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
+  const [selectedCategoryIdState, setSelectedCategoryId] = useState<number | null>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [exclusionDialog, setExclusionDialog] = useState<
     { categoryId: number; mode: 'exclude' | 'include' } | null
   >(null)
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const selectedCategoryId =
+    selectedCategoryIdState !== null && categoryById.has(selectedCategoryIdState)
+      ? selectedCategoryIdState
+      : null
   const activeCategories = useMemo(() => categories.filter((c) => !c.isArchived), [categories])
   const rankedCategories = useMemo(
     () => rankCategoriesByCount(activeCategories, transactions),
@@ -261,12 +266,6 @@ export function MonthView() {
     return rankedCategories.filter((c) => c.id !== undefined && idsWithTx.has(c.id))
   }, [rankedCategories, monthTransactions])
 
-  useEffect(() => {
-    if (selectedCategoryId !== null && !categoryById.has(selectedCategoryId)) {
-      setSelectedCategoryId(null)
-    }
-  }, [selectedCategoryId, categoryById])
-
   const monthTotal = monthTransactions.reduce((sum, tx) => sum + tx.amountCents, 0)
 
   const seenTxIds = useRef<Set<number> | null>(null)
@@ -278,7 +277,8 @@ export function MonthView() {
       seenTxIds.current = currentIds
       return
     }
-    const added = [...currentIds].filter((id) => !seenTxIds.current!.has(id))
+    const previousIds = seenTxIds.current
+    const added = [...currentIds].filter((id) => !previousIds.has(id))
     seenTxIds.current = currentIds
     if (added.length === 0) return
     setFreshTxIds((prev) => new Set([...prev, ...added]))
@@ -380,9 +380,11 @@ export function MonthView() {
   const years = availableYears.length > 0 ? availableYears : [selectedYear]
 
   useEffect(() => {
-    if (monthsWithData.length > 0 && !monthsWithData.includes(month)) {
-      setMonth(monthsWithData[monthsWithData.length - 1]!)
-    }
+    const latestMonth = monthsWithData.at(-1)
+    if (!latestMonth || monthsWithData.includes(month)) return
+
+    const timer = window.setTimeout(() => setMonth(latestMonth), 0)
+    return () => window.clearTimeout(timer)
   }, [monthsWithData, month])
 
   function updateMonth(year: number, monthIndex: number) {

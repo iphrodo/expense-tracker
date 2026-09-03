@@ -1,38 +1,35 @@
-export const THEME_STORAGE_KEY = 'expense-tracker.theme'
-
 export type Theme = 'dark' | 'light'
 
-export function isTheme(value: string | null | undefined): value is Theme {
-  return value === 'dark' || value === 'light'
+export const DARK_THEME_START_HOUR = 20
+export const LIGHT_THEME_START_HOUR = 7
+
+export function resolveThemeAtTime(date = new Date()): Theme {
+  const hour = date.getHours()
+  return hour >= DARK_THEME_START_HOUR || hour < LIGHT_THEME_START_HOUR ? 'dark' : 'light'
 }
 
-export function resolveTheme(storedValue: string | null | undefined): Theme {
-  return isTheme(storedValue) ? storedValue : 'dark'
-}
+export function millisecondsUntilThemeChange(date = new Date()): number {
+  const nextChange = new Date(date)
 
-function readStoredTheme(): string | null {
-  try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY)
-  } catch {
-    return null
+  if (resolveThemeAtTime(date) === 'dark') {
+    nextChange.setHours(LIGHT_THEME_START_HOUR, 0, 0, 0)
+    if (date.getHours() >= DARK_THEME_START_HOUR) nextChange.setDate(nextChange.getDate() + 1)
+  } else {
+    nextChange.setHours(DARK_THEME_START_HOUR, 0, 0, 0)
   }
+
+  return nextChange.getTime() - date.getTime()
 }
 
 export function getInitialTheme(): Theme {
   const documentTheme = document.documentElement.dataset.theme
-  return isTheme(documentTheme) ? documentTheme : resolveTheme(readStoredTheme())
+  return documentTheme === 'dark' || documentTheme === 'light'
+    ? documentTheme
+    : resolveThemeAtTime()
 }
 
-export function applyTheme(theme: Theme, persist = false) {
+export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
   const themeColor = theme === 'dark' ? '#111315' : '#fbfbfa'
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor)
-
-  if (!persist) return
-
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
-  } catch {
-    // A private/restricted browser context can still use the selected theme for this session.
-  }
 }
