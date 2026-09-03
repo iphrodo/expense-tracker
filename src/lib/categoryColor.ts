@@ -30,7 +30,7 @@ const PALETTE = [
  * recomputed, so it's independent of any other category being archived/deleted/created.
  */
 export function colorForIndex(index: number): string {
-  return PALETTE[index % PALETTE.length]!
+  return PALETTE[index % PALETTE.length] ?? FALLBACK_CATEGORY_COLOR
 }
 
 /**
@@ -96,8 +96,5 @@ function hueFamilyOf(colorClass: string | undefined): string | undefined {
  */
 export function getCategoryColorRoles(category: { color?: string } | undefined): CategoryColorRoles {
   const family = hueFamilyOf(category?.color)
-  if (family && family in ROLE_BY_FAMILY) {
-    return ROLE_BY_FAMILY[family]!
-  }
-  return FALLBACK_ROLES
+  return family ? ROLE_BY_FAMILY[family] ?? FALLBACK_ROLES : FALLBACK_ROLES
 }

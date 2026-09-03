@@ -7,7 +7,7 @@ import { CategoryHistoryView } from './features/analytics/CategoryHistoryView'
 import { ImportExportScreen } from './features/import/ImportExportScreen'
 import { CategoriesScreen } from './features/categories/CategoriesScreen'
 import { supabase } from './lib/supabase'
-import { applyTheme, getInitialTheme, type Theme } from './lib/theme'
+import { applyTheme, getInitialTheme, millisecondsUntilThemeChange, resolveThemeAtTime, type Theme } from './lib/theme'
 
 type Screen = 'month' | 'history' | 'averages' | 'categories' | 'import'
 
@@ -45,6 +45,31 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [moreOpen])
 
+  useEffect(() => {
+    let timeoutId: number | undefined
+
+    const scheduleThemeChange = () => {
+      const nextTheme = resolveThemeAtTime()
+      applyTheme(nextTheme)
+      setTheme(nextTheme)
+      timeoutId = window.setTimeout(scheduleThemeChange, millisecondsUntilThemeChange())
+    }
+
+    const syncThemeWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        window.clearTimeout(timeoutId)
+        scheduleThemeChange()
+      }
+    }
+
+    scheduleThemeChange()
+    document.addEventListener('visibilitychange', syncThemeWhenVisible)
+    return () => {
+      window.clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', syncThemeWhenVisible)
+    }
+  }, [])
+
   function closeMore(returnFocus = false) {
     setMoreOpen(false)
     if (returnFocus) requestAnimationFrame(() => moreTriggerRef.current?.focus())
@@ -57,7 +82,7 @@ function App() {
 
   function toggleTheme() {
     const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark'
-    applyTheme(nextTheme, true)
+    applyTheme(nextTheme)
     setTheme(nextTheme)
   }
 

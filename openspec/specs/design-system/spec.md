@@ -92,43 +92,44 @@ readable on their corresponding themed surfaces.
 - **THEN** a category keeps its deterministic identity color and its label remains readable on the
   themed category tint and surrounding surface
 
-### Requirement: Dark theme is the initial theme unless the user has selected otherwise
-The application SHALL render dark theme on the first visit and whenever no valid explicit theme
-preference is available. It SHALL NOT derive the initial theme from the operating-system preference.
-Before the React UI is displayed, the document theme SHALL be resolved so the page does not visibly
-flash another scheme.
+### Requirement: Theme follows the local time
+The application SHALL use the browser's local time to render dark theme from 20:00 inclusive until
+07:00 exclusive, and light theme from 07:00 inclusive until 20:00 exclusive. Before the React UI
+is displayed, the document theme SHALL be resolved so the page does not visibly flash another
+scheme. The open application SHALL automatically update at either boundary and when a backgrounded
+tab becomes visible again. It SHALL NOT derive the theme from the operating-system preference or a
+previously stored selection.
 
-#### Scenario: First visit defaults to dark
-- **WHEN** the application opens on a device with no stored valid theme preference
+#### Scenario: Application opens during dark-theme hours
+- **WHEN** the application opens from 20:00 inclusive through 07:00 exclusive in the browser's
+  local time
 - **THEN** the document and initial UI render in dark theme
 
-#### Scenario: OS preference does not override the product default
-- **WHEN** the device is configured to prefer light mode and the user has no stored preference
-- **THEN** the application still renders in dark theme
+#### Scenario: Application opens during light-theme hours
+- **WHEN** the application opens from 07:00 inclusive through 20:00 exclusive in the browser's
+  local time
+- **THEN** the document and initial UI render in light theme
 
-#### Scenario: Invalid or inaccessible storage falls back safely
-- **WHEN** the saved value is not `dark` or `light`, or browser storage cannot be read
-- **THEN** the application renders in dark theme and remains usable
+#### Scenario: Automatic change occurs while the app is open
+- **WHEN** the browser's local time reaches 07:00 or 20:00 while the application is open
+- **THEN** the application respectively switches to light or dark theme without requiring a reload
 
-### Requirement: A user can switch theme from every app shell and their choice persists locally
+### Requirement: A user can temporarily switch theme from every app shell
 The application SHALL provide a keyboard-accessible theme switch in the desktop header and mobile
-“Ще” menu. Activating it SHALL immediately switch between dark and light themes, expose the current
-state programmatically, and save the explicit choice locally for later visits on that device. The
-control SHALL meet the shared focus and minimum-target requirements.
+“Ще” menu. Activating it SHALL immediately switch between dark and light themes and expose the
+current state programmatically. A manual selection SHALL last until the next scheduled automatic
+change, after which the time-based theme is applied again. The control SHALL meet the shared focus
+and minimum-target requirements.
 
 #### Scenario: Desktop user changes to light theme
 - **WHEN** a desktop user activates the theme switch while dark mode is active
 - **THEN** the interface immediately changes to light mode, the control exposes light as selected,
-  and the choice is saved locally
+  until the next scheduled automatic change
 
 #### Scenario: Mobile user changes to dark theme
 - **WHEN** a mobile user activates the theme action in the “Ще” menu while light mode is active
 - **THEN** the interface immediately changes to dark mode, the menu remains operable, and the
-  choice is saved locally
-
-#### Scenario: Explicit choice is restored on a later visit
-- **WHEN** the user selected light mode, closes the app, and visits again on the same device
-- **THEN** light mode is resolved before the UI is shown
+  manually selected theme remains active until the next scheduled automatic change
 
 #### Scenario: Keyboard user can identify and operate the switch
 - **WHEN** the theme control receives keyboard focus

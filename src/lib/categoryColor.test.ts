@@ -7,11 +7,11 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function relativeLuminance([r, g, b]: [number, number, number]): number {
-  const [rs, gs, bs] = [r, g, b].map((c) => {
-    const s = c / 255
+  const linearize = (channel: number) => {
+    const s = channel / 255
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * rs! + 0.7152 * gs! + 0.0722 * bs!
+  }
+  return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
 }
 
 function contrastRatio(hexA: string, hexB: string): number {
@@ -41,7 +41,12 @@ describe('colorForIndex', () => {
     const colors = Array.from({ length: 17 }, (_, i) => colorForIndex(i))
     const hueFamily = (cls: string) => cls.match(/bg-(\w+)-100/)?.[1]
     for (let i = 1; i < colors.length; i++) {
-      expect(hueFamily(colors[i]!)).not.toBe(hueFamily(colors[i - 1]!))
+      const current = colors[i]
+      const previous = colors[i - 1]
+      if (current === undefined || previous === undefined) {
+        throw new Error('Palette index unexpectedly missing')
+      }
+      expect(hueFamily(current)).not.toBe(hueFamily(previous))
     }
   })
 })

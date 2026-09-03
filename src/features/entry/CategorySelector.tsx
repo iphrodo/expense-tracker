@@ -36,6 +36,7 @@ function filterByPrefix(categories: Category[], query: string): Category[] {
 
 /** Top `CHIP_COUNT` categories by rank, with the selected category promoted to the front if it
  *  would otherwise fall outside that slice (e.g. just chosen from the "All" picker). */
+// eslint-disable-next-line react-refresh/only-export-components -- this hook is intentionally colocated with its category UI helpers.
 export function useCategoryChips(
   rankedCategories: Category[],
   selectedCategoryId: number | null,

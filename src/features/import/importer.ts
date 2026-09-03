@@ -86,14 +86,21 @@ export async function importSeedCsv(
   }
 
   if (toCreate.length > 0) {
-    await createTransactions(
-      toCreate.map((row) => ({
+    const transactionsToCreate = toCreate.map((row) => {
+      const categoryId = categoryIdByName.get(row.category)
+      if (categoryId === undefined) {
+        throw new CsvParseError(`Line ${row.lineNumber}: category "${row.category}" not created`)
+      }
+      return {
         amountCents: row.amountCents,
-        categoryId: categoryIdByName.get(row.category)!,
+        categoryId,
         date: row.date,
         note: row.note,
         importRowIndex: row.rowIndex,
-      })),
+      }
+    })
+    await createTransactions(
+      transactionsToCreate,
     )
   }
 
