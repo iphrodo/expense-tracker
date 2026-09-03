@@ -129,7 +129,7 @@ export function ImportExportScreen() {
         <button
           type="button"
           onClick={() => void handleBackupExport()}
-          className="t-body h-11 rounded-md bg-accent px-s4 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
+          className="t-body h-11 rounded-md bg-accent px-s4 font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-press"
         >
           Export data (backup)
         </button>

@@ -79,7 +79,7 @@ export function CategoriesScreen() {
         <button
           type="button"
           onClick={() => setShowAddForm(true)}
-          className="t-body h-10 rounded-md bg-accent px-s3 font-semibold text-white hover:bg-accent-hover active:bg-accent-press"
+          className="t-body h-10 rounded-md bg-accent px-s3 font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-press"
         >
           Add category
         </button>

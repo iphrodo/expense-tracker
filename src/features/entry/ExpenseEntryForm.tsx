@@ -63,10 +63,13 @@ export function ExpenseEntryForm() {
   const allPickerRef = useRef<CategorySelectorHandle>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const noteInputRef = useRef<HTMLInputElement>(null)
+  // On phones, returning to the Month screen should not raise the software keyboard or jump the
+  // viewport to the form. Desktop keeps the fast keyboard-entry path on initial load.
+  const focusAmountOnMount = window.matchMedia?.('(min-width: 900px)').matches === true
 
   useEffect(() => {
-    amountRef.current?.focus()
-  }, [])
+    if (focusAmountOnMount) amountRef.current?.focus()
+  }, [focusAmountOnMount])
 
   const activeCategories = useMemo(() => categories.filter((c) => !c.isArchived), [categories])
   const rankedCategories = useMemo(
@@ -176,7 +179,6 @@ export function ExpenseEntryForm() {
               }}
               placeholder="0.00"
               aria-label="Amount"
-              autoFocus
               className="tabular-amount min-w-0 flex-1 border-none bg-transparent text-[24px] font-[650] tracking-[-0.02em] text-text outline-none focus-visible:outline-none placeholder:text-text-3"
             />
             {preview && (
@@ -191,7 +193,7 @@ export function ExpenseEntryForm() {
         <button
           type="button"
           onClick={() => void handleSave()}
-          className="t-body h-12 w-[84px] flex-none rounded-md bg-accent font-semibold text-white transition-colors duration-[120ms] ease-out hover:bg-accent-hover active:bg-accent-press [grid-area:save] min-[900px]:w-[120px]"
+          className="t-body h-12 w-[84px] flex-none rounded-md bg-accent font-semibold text-on-accent transition-colors duration-[120ms] ease-out hover:bg-accent-hover active:bg-accent-press [grid-area:save] min-[900px]:w-[120px]"
         >
           Save
         </button>
