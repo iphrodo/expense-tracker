@@ -96,15 +96,17 @@ export function CategoryChipsRow({
 interface CategoryAllPickerProps extends CategoryPickerProps {
   label: ReactNode
   className?: string
+  /** Which trigger edge anchors the dropdown. History uses left alignment to stay in viewport. */
+  panelAlign?: 'left' | 'right'
   /** History/filter contexts select existing categories only. */
   allowCreate?: boolean
 }
 
-/** Trigger pill that opens the full searchable category picker (a bottom sheet on mobile,
- *  a dropdown on desktop via CSS breakpoint), with keyboard nav and inline category creation. */
+/** Trigger pill that opens the full searchable category picker next to its trigger,
+ *  with keyboard navigation and inline category creation. */
 export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllPickerProps>(
   function CategoryAllPicker(
-    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit, label, className = '', allowCreate = true },
+    { rankedCategories, selectedCategoryId, onSelect, onCreateCategory, onSubmit, label, className = '', panelAlign = 'right', allowCreate = true },
     handleRef,
   ) {
     const [open, setOpen] = useState(false)
@@ -136,19 +138,6 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
       }
       document.addEventListener('keydown', handleKey)
       return () => document.removeEventListener('keydown', handleKey)
-    }, [open])
-
-    // Lock background scroll while the sheet/dropdown is open. Without this, dragging past the
-    // top/bottom of the category list on iOS Safari chains the scroll to the page behind it,
-    // which — because the panel is `position: fixed` — makes it visibly slide away from its
-    // anchored spot as the page scrolls underneath it.
-    useEffect(() => {
-      if (!open) return
-      const previousOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = previousOverflow
-      }
     }, [open])
 
     function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -189,7 +178,7 @@ export const CategoryAllPicker = forwardRef<CategorySelectorHandle, CategoryAllP
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={closePanel} />
-            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overscroll-contain rounded-t-lg border border-border bg-surface p-s3 shadow-2 min-[900px]:absolute min-[900px]:inset-x-auto min-[900px]:right-0 min-[900px]:bottom-auto min-[900px]:top-[calc(100%+8px)] min-[900px]:max-h-96 min-[900px]:w-80 min-[900px]:rounded-lg">
+            <div className={`absolute top-[calc(100%+8px)] z-50 w-[min(20rem,calc(100vw-2rem))] max-h-96 overscroll-contain rounded-lg border border-border bg-surface p-s3 shadow-2 ${panelAlign === 'left' ? 'left-0' : 'right-0'}`}>
               <input
                 ref={inputRef}
                 type="text"
