@@ -49,6 +49,7 @@ export function CategoryHistoryView() {
                 onSelect={(id) => { setCategoryId(id); setExpandedMonth(null); setEditingTx(null) }}
                 onCreateCategory={() => Promise.reject(new Error('Category creation is unavailable here'))}
                 onSubmit={() => undefined}
+                panelAlign="left"
                 allowCreate={false}
                 label={<span className="flex items-center gap-s2"><span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: selectedCategory ? roles.dot : 'currentColor' }} />{selectedCategory ? `${selectedCategory.name}${selectedCategory.isArchived ? ' (архів)' : ''}` : 'Оберіть категорію'}</span>}
                 className="w-fit"
