@@ -189,8 +189,31 @@ describe('computeHistoricalTotals', () => {
     // Jan (31 days) + Feb (28 days) = 59 days.
     expect(result.dailyAverageCents).toBeCloseTo(30000 / 59)
     expect(result.monthlyAverageCents).toBe(15000)
+    expect(result.forecastedDailyAverageCents).toBeCloseTo(30000 / 59)
+    expect(result.forecastedMonthlyAverageCents).toBe(15000)
     // Only the Квартира (non-daily) transaction counts, spread over 2 months.
     expect(result.nonDailyMonthlyAverageCents).toBe(10000)
+  })
+
+  it('calculates the forecast without exclusions and spreads equipment over 60 months', () => {
+    const now = new Date('2026-06-15')
+    const categories = [
+      { id: 1, name: 'Продукти', isDaily: true },
+      { id: 2, name: 'Техніка', isDaily: false },
+    ]
+    const transactions: Transaction[] = [
+      tx({ categoryId: 1, date: '2026-01-05', amountCents: 10000 }),
+      tx({ categoryId: 1, date: '2026-02-05', amountCents: 20000 }),
+      tx({ categoryId: 2, date: '2026-01-05', amountCents: 60000 }),
+    ]
+    const result = computeHistoricalTotals(transactions, categories, [], now)
+
+    // The historical values remain unfiltered: 90,000 / 2 months.
+    expect(result.totalCents).toBe(90000)
+    expect(result.monthlyAverageCents).toBe(45000)
+    // Forecast: ordinary category 30,000 / 2 + equipment 60,000 / 60.
+    expect(result.forecastedMonthlyAverageCents).toBe(16000)
+    expect(result.forecastedDailyAverageCents).toBeCloseTo(16000 / (59 / 2))
   })
 
   it('excludes the current (incomplete) month unless a MonthFlag marks it complete', () => {
@@ -219,6 +242,8 @@ describe('computeHistoricalTotals', () => {
     expect(result.lastMonth).toBeNull()
     expect(result.dailyAverageCents).toBe(0)
     expect(result.monthlyAverageCents).toBe(0)
+    expect(result.forecastedDailyAverageCents).toBe(0)
+    expect(result.forecastedMonthlyAverageCents).toBe(0)
     expect(result.nonDailyMonthlyAverageCents).toBe(0)
   })
 })
