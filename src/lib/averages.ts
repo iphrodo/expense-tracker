@@ -139,6 +139,8 @@ export interface HistoricalTotals {
   lastMonth: string | null
   dailyAverageCents: number
   monthlyAverageCents: number
+  forecastedDailyAverageCents: number
+  forecastedMonthlyAverageCents: number
   nonDailyMonthlyAverageCents: number
 }
 
@@ -163,6 +165,22 @@ export function computeHistoricalTotals(
   const sortedMonths = [...completeMonths].sort()
   const monthsCount = sortedMonths.length
   const totalDays = sortedMonths.reduce((sum, month) => sum + daysInMonthOf(month), 0)
+  const totalsByCategory = new Map<number, number>()
+  for (const tx of eligible) {
+    totalsByCategory.set(tx.categoryId, (totalsByCategory.get(tx.categoryId) ?? 0) + tx.amountCents)
+  }
+  const equipmentCategoryIds = new Set(
+    categories.filter((category) => category.name === EQUIPMENT_CATEGORY_NAME).map((category) => category.id),
+  )
+  const forecastedMonthlyAverageCents =
+    monthsCount === 0
+      ? 0
+      : [...totalsByCategory.entries()].reduce(
+          (sum, [categoryId, categoryTotal]) =>
+            sum + categoryTotal / (equipmentCategoryIds.has(categoryId) ? EQUIPMENT_LIFETIME_MONTHS : monthsCount),
+          0,
+        )
+  const averageMonthLength = monthsCount === 0 ? 0 : totalDays / monthsCount
 
   return {
     totalCents,
@@ -171,6 +189,9 @@ export function computeHistoricalTotals(
     lastMonth: sortedMonths[sortedMonths.length - 1] ?? null,
     dailyAverageCents: totalDays === 0 ? 0 : totalCents / totalDays,
     monthlyAverageCents: monthsCount === 0 ? 0 : totalCents / monthsCount,
+    forecastedDailyAverageCents:
+      averageMonthLength === 0 ? 0 : forecastedMonthlyAverageCents / averageMonthLength,
+    forecastedMonthlyAverageCents,
     nonDailyMonthlyAverageCents: monthsCount === 0 ? 0 : nonDailyCents / monthsCount,
   }
 }

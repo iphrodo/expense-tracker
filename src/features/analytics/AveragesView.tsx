@@ -71,6 +71,20 @@ export function AveragesView() {
             <div className="t-micro mt-0.5 text-text-3">€/місяць (в середньому)</div>
           </div>
         </div>
+        <div className="mt-s4 border-t border-border pt-s4">
+          <div className="t-micro text-text-3">ПРОГНОЗОВАНІ ВИТРАТИ</div>
+          <div className="t-micro mt-0.5 text-text-3">Без виключень · «Техніка» розподілена на 60 міс.</div>
+          <div className="mt-s3 flex gap-s3">
+            <div className="flex-1">
+              <div className="t-num-lg text-text">{formatCents(historicalTotals.forecastedDailyAverageCents)}</div>
+              <div className="t-micro mt-0.5 text-text-3">€/день (прогноз)</div>
+            </div>
+            <div className="flex-1">
+              <div className="t-num-lg text-text">{formatCents(historicalTotals.forecastedMonthlyAverageCents)}</div>
+              <div className="t-micro mt-0.5 text-text-3">€/місяць (прогноз)</div>
+            </div>
+          </div>
+        </div>
         <div className="mt-s4 flex items-baseline justify-between border-t border-border pt-s4">
           <span className="t-meta text-text-2">
             {historicalTotals.monthsCount === 0
